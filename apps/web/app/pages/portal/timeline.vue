@@ -16,10 +16,15 @@ const kinds=['EXAM','PROJECT','HACKATHON','VACATION','TRAVEL','LEARNING','WORK',
 const horizon=computed(()=>new Date(Date.now()+range.value*86400000))
 const events=computed(()=>{
  const list:any[]=[]
- for(const a of data.value?.activities||[])list.push({id:'a'+a.id,date:a.startDate,end:a.endDate,title:a.title,detail:`${a.kind.charAt(0)+a.kind.slice(1).toLowerCase()}${a.source==='GOOGLE'?' · from Google Calendar (type inferred — correct it if wrong)':' · manual'}`,type:'Activity',raw:a})
+ for(const a of data.value?.activities||[])list.push({id:'a'+a.id,date:a.startDate,end:a.endDate,title:a.title,detail:`${a.kind.charAt(0)+a.kind.slice(1).toLowerCase()}${a.source==='GOOGLE'?' · Google':' · manual'}`,type:'Activity',raw:a})
  for(const r of data.value?.renewals||[])list.push({id:r.id,date:r.date,end:r.date,title:`${r.title} renews`,detail:money(r.amount),type:'Renewal'})
  for(const i of data.value?.intentions||[])if(i.status==='PLANNED')list.push({id:'i'+i.id,date:i.startDate,end:i.endDate||i.startDate,title:`Plan: ${i.subscription?.name||'Service'}`,detail:i.reason,type:'Intention'})
- return list.filter(e=>(kindFilter.value==='ALL'||e.type!=='Activity'||e.raw?.kind===kindFilter.value)&&new Date(e.end)>=new Date(new Date().setHours(0,0,0,0))&&new Date(e.date)<=horizon.value).sort((a,b)=>+new Date(a.date)-+new Date(b.date))
+ const filtered=list.filter(e=>(kindFilter.value==='ALL'||e.type!=='Activity'||e.raw?.kind===kindFilter.value)&&new Date(e.end)>=new Date(new Date().setHours(0,0,0,0))&&new Date(e.date)<=horizon.value).sort((a,b)=>+new Date(a.date)-+new Date(b.date))
+ // Google loves firing the same reminder 5x a day. Show it once, with the times.
+ const out:any[]=[],seen=new Map<string,any>()
+ for(const e of filtered){if(e.type!=='Activity'){out.push(e);continue}const key=e.title.toLowerCase()+'|'+new Date(e.date).toDateString();const first=seen.get(key);if(first){first.count=(first.count||1)+1;first.times.push(new Date(e.date));first.ids.push(e.id)}else{const copy={...e,count:1,times:[new Date(e.date)],ids:[e.id]};seen.set(key,copy);out.push(copy)}}
+ for(const e of out)if(e.count>1)e.detail+=` · ×${e.count} (${e.times.map((d:Date)=>d.toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit'})).join(', ')})`
+ return out
 })
 function edit(a?:any){editing.value=a?.id||'';form.value=a?{title:a.title,description:a.description||'',kind:a.kind,startDate:a.startDate.slice(0,10),endDate:a.endDate.slice(0,10)}:{title:'',description:'',kind:'OTHER',startDate:new Date().toISOString().slice(0,10),endDate:new Date().toISOString().slice(0,10)};open.value=true}
 async function save(){busy.value=true;try{await api(`/advisor/activities${editing.value?'/'+editing.value:''}`,{method:editing.value?'PUT':'POST',body:form.value});open.value=false;await refresh();toast.add({title:'Activity saved',color:'success'})}catch(e){toast.add({title:errorMessage(e),color:'error'})}finally{busy.value=false}}
@@ -32,8 +37,8 @@ async function disconnect(){busy.value=true;try{await api('/calendar',{method:'D
   <div class="flex flex-wrap justify-between gap-4"><div><h1 class="text-2xl font-semibold tracking-tight">Your life, your renewals, one timeline</h1></div><UButton icon="i-lucide-plus" @click="edit()">Add activity</UButton></div>
   <UAlert v-if="error" color="error" :title="errorMessage(error)"/>
   <UAlert v-if="msg" color="neutral" :title="msg"/>
-  <section class="border-y border-default py-4"><div class="flex flex-wrap justify-between items-center gap-4"><div><p class="font-medium">Google Calendar <UBadge v-if="cal?.connected" color="success" variant="subtle" class="ms-2">Connected</UBadge></p><p class="text-sm text-muted mt-1">Read-only. Never edits your calendar.</p></div><div class="flex gap-2"><UButton v-if="!cal?.connected" to="/api/auth/google?calendar=1" external icon="i-lucide-calendar-plus">Connect Calendar</UButton><template v-else><UButton :loading="busy" icon="i-lucide-refresh-cw" @click="sync">Sync now</UButton><UButton color="error" variant="ghost" :disabled="busy" @click="disconnect">Disconnect</UButton></template></div></div>
-   <p class="text-xs text-muted mt-3">Use the same Google account as your login, approve, then Sync now. Blocked? Enable “Google Calendar API” and add your Gmail as a test user in Google Auth Platform → Audience.</p></section>
+  <section class="border-y border-default py-4"><div class="flex flex-wrap justify-between items-center gap-4"><div><p class="font-medium">Google Calendar <UBadge v-if="cal?.connected" color="success" variant="subtle" class="ms-2">Connected</UBadge></p></div><div class="flex gap-2"><UButton v-if="!cal?.connected" to="/api/auth/google?calendar=1" external icon="i-lucide-calendar-plus">Connect Calendar</UButton><template v-else><UButton :loading="busy" icon="i-lucide-refresh-cw" @click="sync">Sync now</UButton><UButton color="error" variant="ghost" :disabled="busy" @click="disconnect">Disconnect</UButton></template></div></div>
+</section>
   <section><MiniCalendar :events="calEvents" :selected="selectedDay" @select-day="selectedDay=selectedDay===$event?'':$event"/>
    <div v-if="selectedDay" class="mt-4 border-t border-default pt-3"><p class="text-xs font-medium text-muted">{{new Date(selectedDay).toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'})}} <UButton size="xs" variant="link" @click="selectedDay=''">clear</UButton></p><p v-for="e in dayEvents" :key="e.id" class="text-sm mt-1.5">{{e.title}} <span class="text-muted">· {{e.type.toLowerCase()}}</span></p><p v-if="!dayEvents.length" class="text-sm text-muted mt-1.5">Nothing on this day.</p></div>
   </section>

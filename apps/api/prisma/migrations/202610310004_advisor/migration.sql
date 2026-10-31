@@ -31,6 +31,7 @@ CREATE TABLE "LifeActivity" (
     "endDate" TIMESTAMP(3) NOT NULL,
     "source" TEXT NOT NULL DEFAULT 'MANUAL',
     "sourceRef" TEXT,
+    "kindLocked" BOOLEAN NOT NULL DEFAULT false,
 
     CONSTRAINT "LifeActivity_pkey" PRIMARY KEY ("id")
 );

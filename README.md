@@ -104,3 +104,7 @@ Scanning pages through the mailbox without a date cutoff, 30 messages per API re
 ## Customer experience
 
 Customers land on /portal: connect Gmail, scan, review discoveries, then manage a searchable subscription list. Connection settings and discovery review live in drawers/modals rather than permanent sections. Subscription details open before editing; discoveries can be confirmed, updated or skipped. The older /portal/external URL redirects here. Existing Brightloop invoices/contracts remain accessible under /portal/billing, with role isolation preserved.
+
+## Personal Subscription Intelligence Advisor (current product)
+
+The personal advisor is the active product: onboarding (`/portal/onboarding`), Advisor home, Timeline (manual activities + optional read-only Google Calendar), Subscriptions (Active/Planned/Interested/Inactive with category, self-reported usage, importance, purpose; Gmail discovery retained), Plans & intentions (marking done never activates a service), Spending (active only; planned excluded), and Preferences. Recommendations are deterministic and explainable; potential savings are labelled potential, never claimed as realised. Migration `202610310004_advisor` is additive and applied. Deferred: verified external release/price feeds, background notifications, provider pause/cancel automation, and monetisation — no fabricated feeds or prices.

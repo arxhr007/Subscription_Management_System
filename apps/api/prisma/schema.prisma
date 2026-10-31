@@ -315,6 +315,7 @@ model LifeActivity {
  endDate DateTime
  source String @default("MANUAL")
  sourceRef String?
+ kindLocked Boolean @default(false)
  intentions SubscriptionIntent[]
  @@unique([userId,sourceRef])
  @@index([userId,startDate])

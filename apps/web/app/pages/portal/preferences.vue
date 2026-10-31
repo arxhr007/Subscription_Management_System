@@ -9,7 +9,7 @@ async function save(){busy.value=true;try{await api('/advisor/profile',{method:'
 </script>
 <template>
  <div class="page max-w-2xl space-y-6">
-  <div><h1 class="text-2xl font-semibold tracking-tight">Preferences</h1><p class="text-sm text-muted mt-2">Your profile shapes advice. Edit anytime — dismissed advice stays respected.</p></div>
+  <div><h1 class="text-2xl font-semibold tracking-tight">Preferences</h1></div>
   <section><form class="space-y-5" @submit.prevent="save">
    <UFormField label="Name"><UInput v-model="form.name" class="w-full"/></UFormField>
    <UFormField label="Occupation"><USelect v-model="form.occupation" :items="[{label:'Student',value:'STUDENT'},{label:'Professional',value:'PROFESSIONAL'},{label:'Freelancer / creator',value:'FREELANCER'},{label:'Other',value:'OTHER'}]" class="w-full"/></UFormField>
@@ -19,7 +19,7 @@ async function save(){busy.value=true;try{await api('/advisor/profile',{method:'
    <UCheckbox v-model="form.notifications" label="Contextual reminders before renewals and activities"/>
    <UButton type="submit" :loading="busy">Save preferences</UButton>
   </form></section>
-  <section class="border-t border-default pt-6"><p class="font-medium">Setup</p><p class="text-sm text-muted mt-2">Skipped onboarding, or want to redo it? Run the quick setup again — your existing subscriptions won't be duplicated.</p><UButton class="mt-4" icon="i-lucide-wand-sparkles" to="/portal/onboarding">Run quick setup again</UButton></section>
-  <section class="border-t border-default pt-6"><p class="font-medium">Connections</p><p class="text-sm text-muted mt-2">Gmail discovery lives on Subscriptions. Google Calendar connect, sync and disconnect live on Timeline. Both are optional and read-only.</p><div class="flex gap-2 mt-4"><UButton color="neutral" variant="outline" to="/portal/subscriptions">Gmail & subscriptions</UButton><UButton color="neutral" variant="outline" to="/portal/timeline">Calendar & timeline</UButton></div></section>
+  <section class="border-t border-default pt-6"><p class="font-medium">Setup</p><UButton class="mt-4" icon="i-lucide-wand-sparkles" to="/portal/onboarding">Run quick setup again</UButton></section>
+  <section class="border-t border-default pt-6"><p class="font-medium">Connections</p><div class="flex gap-2 mt-4"><UButton color="neutral" variant="outline" to="/portal/subscriptions">Subscriptions</UButton><UButton color="neutral" variant="outline" to="/portal/timeline">Calendar & timeline</UButton></div></section>
  </div>
 </template>

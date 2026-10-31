@@ -1,7 +1,9 @@
 import { connectCalendar } from './calendar';
 import { connectGmail } from '../lib/gmail';
 import { Router } from 'express';
-import { loginSchema, signupSchema, staffSchema } from '@brightloop/shared';
+import { loginSchema, signupSchema, staffSchema, isStrongPassword } from '@brightloop/shared';
+import { z } from 'zod';
+import { createClient } from '@supabase/supabase-js';
 import { adminOnly, clearSession, rateLimit, requireAuth, setSession } from '../lib/auth';
 import { audit } from '../lib/audit';
 import { prisma } from '../lib/db';
@@ -67,6 +69,23 @@ authRouter.get('/providers', async (_req,res) => {
     res.json({ google: response.ok && settings.external?.google === true });
   } catch { res.json({ google: false }); }
 });
+authRouter.post('/forgot-password', rateLimit(5,900_000), async (req,res) => {
+  const { email } = parse(z.object({ email: z.email() }), req.body);
+  // Always succeed: never reveal whether an account exists. Supabase sends the reset email.
+  try { const implicit = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_PUBLISHABLE_KEY!, { auth: { flowType: 'implicit', persistSession: false, autoRefreshToken: false } }); await implicit.auth.resetPasswordForEmail(email, { redirectTo: `${process.env.WEB_ORIGIN ?? 'http://localhost:3000'}/auth/reset` }); } catch { /* still ok */ }
+  res.json({ ok: true });
+});
+authRouter.post('/reset-password', rateLimit(10,900_000), async (req,res) => {
+  const d = parse(z.object({ accessToken: z.string().min(20), refreshToken: z.string().min(20), password: z.string(), confirmPassword: z.string() }), req.body);
+  if (d.password !== d.confirmPassword) throw new HttpError(400, 'Passwords do not match');
+  if (!isStrongPassword(d.password)) throw new HttpError(400, 'Password needs more than 8 characters, an uppercase letter, a lowercase letter and a special character');
+  const client = supabase();
+  const { data, error } = await client.auth.setSession({ access_token: d.accessToken, refresh_token: d.refreshToken });
+  if (error || !data.user) throw new HttpError(400, 'This reset link has expired. Request a new one.');
+  const { error: updateError } = await client.auth.updateUser({ password: d.password });
+  if (updateError) throw new HttpError(400, 'Could not set the new password. Request a new reset link.');
+  res.json({ ok: true });
+});
 authRouter.get('/google', rateLimit(20,60_000), async (req,res) => {
   const gmail = req.query.gmail === '1';
   const calendar=req.query.calendar==='1';
@@ -76,7 +95,7 @@ authRouter.get('/google', rateLimit(20,60_000), async (req,res) => {
   if (gmail) res.cookie('bl_gmail_user',req.user!.id,{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax',path:'/api/auth',maxAge:600_000});
   else res.clearCookie('bl_gmail_user',{path:'/api/auth'});
   res.cookie('bl_oauth_popup', req.query.popup === '1' ? '1' : '0', { httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax',path:'/api/auth',maxAge:600_000 });
-  const { data,error } = await oauthClient(req,res).auth.signInWithOAuth({ provider:'google', options: { redirectTo: `${process.env.WEB_ORIGIN ?? 'http://localhost:3000'}/api/auth/callback`, skipBrowserRedirect:true, scopes: gmail ? 'https://www.googleapis.com/auth/gmail.readonly' : calendar?'https://www.googleapis.com/auth/calendar.events.readonly':undefined, queryParams: gmail||calendar ? {prompt:'consent select_account',access_type:'offline'} : { prompt: 'select_account' } } });
+  const { data,error } = await oauthClient(req,res).auth.signInWithOAuth({ provider:'google', options: { redirectTo: `${process.env.WEB_ORIGIN ?? 'http://localhost:3000'}/api/auth/callback`, skipBrowserRedirect:true, scopes: gmail ? 'https://www.googleapis.com/auth/gmail.readonly' : calendar?'https://www.googleapis.com/auth/calendar.readonly':undefined, queryParams: gmail||calendar ? {prompt:'consent select_account',access_type:'offline'} : { prompt: 'select_account' } } });
   if (error || !data.url) return res.redirect('/login?oauth_error=unavailable');
   res.redirect(data.url);
 });

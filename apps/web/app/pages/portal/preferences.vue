@@ -1,6 +1,6 @@
 <script setup lang="ts">
 const api=useApi(),toast=useToast()
-const {data,refresh}=await useFetch<any>('/api/advisor/profile')
+const {data,refresh}=useFetch<any>('/api/advisor/profile')
 const form=ref({name:'',occupation:'OTHER',interests:[] as string[],activities:'',budget:'',notifications:true})
 watchEffect(()=>{if(data.value)form.value={name:data.value.name,occupation:data.value.occupation,interests:[...data.value.interests],activities:data.value.activities,budget:data.value.budget==null?'':String(data.value.budget/100),notifications:data.value.notifications}})
 const input=ref(''),busy=ref(false)
@@ -9,7 +9,7 @@ async function save(){busy.value=true;try{await api('/advisor/profile',{method:'
 </script>
 <template>
  <div class="page max-w-2xl space-y-6">
-  <div><h1 class="text-2xl font-semibold tracking-tight">Preferences</h1></div>
+  <div class="page-head"><div><p class="eyebrow">Make it personal</p><h1>Your priorities. Your rules.</h1><p>Keep your budget, interests and activities up to date.</p></div></div>
   <section><form class="space-y-5" @submit.prevent="save">
    <UFormField label="Name"><UInput v-model="form.name" class="w-full"/></UFormField>
    <UFormField label="Occupation"><USelect v-model="form.occupation" :items="[{label:'Student',value:'STUDENT'},{label:'Professional',value:'PROFESSIONAL'},{label:'Freelancer / creator',value:'FREELANCER'},{label:'Other',value:'OTHER'}]" class="w-full"/></UFormField>

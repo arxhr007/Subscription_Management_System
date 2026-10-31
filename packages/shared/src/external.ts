@@ -15,7 +15,7 @@ export const externalSubscriptionSchema = z.object({
   purpose:z.string().max(1000).default(''),
   managementUrl: z.union([z.literal(''), z.url().refine(s => new URL(s).protocol === 'https:', 'Use an HTTPS link')]).default(''),
   notes: z.string().trim().max(1000).default(''),
-}).refine(d=>d.status!=='ACTIVE'||d.nextRenewal!==null,{path:['nextRenewal'],message:'Add the next renewal date for an active subscription'});
+});
 const providers = [
   { name: 'Netflix', match: /\bnetflix\b/i, managementUrl: 'https://www.netflix.com/YourAccount' },
   { name: 'Amazon Prime', match: /\bamazon\s*prime\b|\bprime\s*video\b/i, managementUrl: 'https://www.amazon.in/prime' },

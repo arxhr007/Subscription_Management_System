@@ -95,6 +95,14 @@ invoicesRouter.post('/:id/confirm', async (req, res) => {
   res.json(await invoiceDetail(req.params.id));
 });
 
+invoicesRouter.post('/:id/send', async (req, res) => {
+  const r = await prisma.invoice.updateMany({ where: { id: req.params.id, status: 'CONFIRMED', sentAt: null }, data: { sentAt: new Date() } });
+  if (!r.count) throw new HttpError(409, 'Only confirmed, unsent invoices can be sent');
+  await audit(prisma, 'invoice', req.params.id, 'Sent to customer', undefined, req.user!.name);
+  broadcast('invoices');
+  res.json(await invoiceDetail(req.params.id));
+});
+
 invoicesRouter.post('/:id/cancel', async (req, res) => {
   const r = await prisma.invoice.updateMany({ where: { id: req.params.id, status: { in: ['DRAFT', 'CONFIRMED'] }, amountPaid: 0 }, data: { status: 'CANCELLED' } });
   if (!r.count) throw new HttpError(409, 'Only unpaid draft or confirmed invoices can be cancelled');

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { data } = await useFetch<{ enabled: boolean }>('/api/ai/status')
+const { data } = useFetch<{ enabled: boolean }>('/api/ai/status')
 const open = ref(false), question = ref(''), busy = ref(false), error = ref('')
 const messages = ref<{ role: 'user' | 'assistant'; content: string }[]>([])
 async function ask() { if (!question.value.trim() || busy.value) return; busy.value = true; error.value = ''; const q = question.value; question.value = ''; const history = messages.value.slice(-10); messages.value.push({ role: 'user', content: q }); try { const r = await useApi()<{ answer: string }>('/ai/ask', { method: 'POST', body: { question: q, history } }); messages.value.push({ role: 'assistant', content: r.answer }) } catch(e) { error.value = errorMessage(e) } finally { busy.value = false } }

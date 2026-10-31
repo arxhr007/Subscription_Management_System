@@ -1,0 +1,6 @@
+<script setup lang="ts">
+definePageMeta({ layout: false })
+const email=ref(''),busy=ref(false),sent=ref(false),error=ref('')
+async function submit(){busy.value=true;error.value='';try{await useApi()('/auth/forgot-password',{method:'POST',body:{email:email.value}});sent.value=true}catch(e){error.value=errorMessage(e)}finally{busy.value=false}}
+</script>
+<template><main class="min-h-screen flex justify-center items-center bg-elevated/30 p-6"><UCard class="w-full max-w-md"><h1 class="text-2xl font-semibold mb-2">Reset your password</h1><p class="text-muted mb-6">We will email you a reset link.</p><UAlert v-if="error" color="error" :title="error" class="mb-4"/><div v-if="sent"><UAlert color="success" title="Check your inbox" description="If that email has an account, a reset link is on its way."/><UButton to="/login" block class="mt-4">Back to sign in</UButton></div><form v-else class="space-y-4" @submit.prevent="submit"><UFormField label="Email address"><UInput v-model="email" type="email" required class="w-full" size="lg"/></UFormField><UButton type="submit" block size="lg" :loading="busy">Email me a reset link</UButton></form><UButton to="/login" variant="link" class="mt-4">Back to sign in</UButton></UCard></main></template>

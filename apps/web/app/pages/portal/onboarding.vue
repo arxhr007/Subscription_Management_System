@@ -35,7 +35,7 @@ async function finish(skipSubs=false){
   if(!skipSubs){
    const existing=await api<{items:{name:string}[]}>('/external-subscriptions').catch(()=>({items:[]}))
    const have=new Set(existing.items.map(i=>i.name.toLowerCase()))
-   const renewal=new Date(Date.now()+30*86400000).toISOString().slice(0,10)
+   const renewal=null
    for(const subName of Object.keys(picked.value)){
     if(have.has(subName.toLowerCase()))continue
     const c=common.find(x=>x.name===subName)

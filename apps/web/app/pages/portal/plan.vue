@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const {data,error,refresh}=await useFetch<any>('/api/advisor/plan')
+const {data,error,refresh}=useFetch<any>('/api/advisor/plan')
 const showJson=ref(false)
 const recColor:Record<string,string>={keep:'success',review:'warning',subscribe:'primary',delay:'neutral',rotate:'warning',evaluate:'neutral'}
 const inr=(v:number|null)=>v==null?'—':'₹'+v.toLocaleString('en-IN')
@@ -7,7 +7,7 @@ const inr=(v:number|null)=>v==null?'—':'₹'+v.toLocaleString('en-IN')
 <template>
  <div class="page space-y-8">
   <div class="flex flex-wrap justify-between items-center gap-3">
-   <h1 class="text-2xl font-semibold tracking-tight">Your plan</h1>
+   <div><p class="eyebrow">Look ahead</p><h1>A plan that fits your life.</h1><p class="text-sm text-muted mt-3">Your commitments and upcoming decisions for the next three months.</p></div>
    <div class="flex gap-2"><UButton size="sm" color="neutral" variant="outline" icon="i-lucide-code" @click="showJson=!showJson">{{showJson?'Hide JSON':'View JSON'}}</UButton><UButton size="sm" color="neutral" variant="ghost" icon="i-lucide-refresh-cw" @click="refresh()">Refresh</UButton></div>
   </div>
   <UAlert v-if="error" color="error" :title="errorMessage(error)"/>

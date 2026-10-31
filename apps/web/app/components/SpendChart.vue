@@ -10,23 +10,24 @@ const months=computed(()=>{
 })
 const maxMonth=computed(()=>Math.max(1,...months.value.map(m=>m.total)))
 const maxCat=computed(()=>Math.max(1,...props.categories.map(c=>c.amount)))
-const budgetPct=computed(()=>props.budget?Math.min(100,Math.round(props.monthly/props.budget*100)):null)
+const budgetPct=computed(()=>props.budget!==null&&props.budget>0?Math.round(props.monthly/props.budget*100):null)
 </script>
 <template>
  <div class="space-y-6">
+  <p v-if="budget===0&&monthly>0" class="text-sm text-error font-semibold" role="status">Your spending exceeds your ₹0 budget by {{money(monthly)}}.</p>
   <div>
    <div class="flex items-baseline justify-between"><p class="text-sm font-semibold">Projected spend — next 6 months</p><p class="text-xs text-muted">from your renewal dates</p></div>
-   <div class="flex items-end gap-2 h-36 mt-4" role="img" :aria-label="`Projected monthly spend: ${months.map(m=>`${m.label} ${money(m.total)}`).join(', ')}`">
+   <div class="flex items-end gap-2 h-48 mt-4 border-b-2 border-default pb-2" role="img" :aria-label="`Projected monthly spend: ${months.map(m=>`${m.label} ${money(m.total)}`).join(', ')}`">
     <div v-for="m in months" :key="m.label" class="flex-1 flex flex-col items-center justify-end h-full gap-1 min-w-0">
      <span class="text-[11px] font-medium tabular-nums truncate">{{m.total?money(m.total):'—'}}</span>
-     <div class="w-full max-w-10 bg-primary/85 hover:bg-primary transition-colors" :style="{height:`${Math.max(m.total?6:2,(m.total/maxMonth)*100)}%`}" :title="`${m.label}: ${money(m.total)} across ${m.count} renewal(s)`"/>
+     <div class="w-full max-w-12 bg-primary/85 hover:bg-primary border-2 border-default shrink-0 transition-colors" :style="{height:`${Math.max(m.total?6:2,(m.total/maxMonth)*125)}px`}" :title="`${m.label}: ${money(m.total)} across ${m.count} renewal(s)`"/>
      <span class="text-[11px] text-muted">{{m.label}}</span>
     </div>
    </div>
   </div>
   <div v-if="budgetPct!==null">
    <div class="flex justify-between text-sm"><span class="font-medium">Budget use</span><span class="tabular-nums" :class="budgetPct>100?'text-error font-semibold':''">{{money(monthly)}} of {{money(budget!)}} · {{budgetPct}}%</span></div>
-   <div class="h-2 rounded-full bg-elevated mt-2 overflow-hidden"><div class="h-full" :class="budgetPct>100?'bg-error':'bg-primary'" :style="{width:`${budgetPct}%`}"/></div>
+   <div class="h-3 border border-default bg-elevated mt-2 overflow-hidden"><div class="h-full" :class="budgetPct>100?'bg-error':'bg-primary'" :style="{width:`${Math.min(100,budgetPct)}%`}"/></div>
   </div>
   <div>
    <p class="text-sm font-semibold mb-3">Where it goes <span class="text-muted font-normal">/ month</span></p>

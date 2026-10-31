@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import ActivityCalendar from '~/components/ActivityCalendar.vue'
+definePageMeta({ alias: ['/portal/calendar'] })
 const api=useApi(),toast=useToast(),route=useRoute()
-const {data,refresh,error}=await useFetch<any>('/api/advisor/overview')
-const {data:cal,refresh:refreshCal}=await useFetch<any>('/api/calendar')
-const range=ref(30),busy=ref(false),msg=ref(route.query.calendar_error?'Calendar connection did not complete. Check the same Google account and permission.':route.query.calendar_connected?'Google Calendar connected. Sync to import activities.':'')
+const {data,refresh,error}=useFetch<any>('/api/advisor/overview')
+const {data:cal,refresh:refreshCal}=useFetch<any>('/api/calendar')
+const range=ref(30),busy=ref(false),msg=ref(route.query.calendar_error?'Calendar connection did not complete. Check the same Google account and permission.':route.query.calendar_connected?'Google Calendar connected. Importing your activities…':'')
 const selectedDay=ref(''),kindFilter=ref('ALL')
 const presentKinds=computed<string[]>(()=>['ALL',...new Set<string>((data.value?.activities||[]).map((a:any)=>String(a.kind)))])
 const calEvents=computed(()=>[
@@ -10,7 +12,7 @@ const calEvents=computed(()=>[
  ...(data.value?.activities||[]).map((a:any)=>({date:a.startDate,end:a.endDate,title:a.title,type:'ACTIVITY' as const})),
  ...(data.value?.intentions||[]).filter((i:any)=>i.status==='PLANNED').map((i:any)=>({date:i.startDate,title:`Start: ${i.subscription?.name||'service'}`,type:'INTENTION' as const})),
 ])
-const dayEvents=computed(()=>selectedDay.value?events.value.filter(e=>new Date(e.date).toDateString()===selectedDay.value):[])
+const dayEvents=computed(()=>selectedDay.value?events.value.filter(e=>{const selected=new Date(selectedDay.value);return selected>=new Date(new Date(e.date).setHours(0,0,0,0))&&selected<=new Date(new Date(e.end).setHours(23,59,59,999))}):[])
 const open=ref(false),editing=ref(''),form=ref({title:'',description:'',kind:'OTHER',startDate:new Date().toISOString().slice(0,10),endDate:new Date().toISOString().slice(0,10)})
 const kinds=['EXAM','PROJECT','HACKATHON','VACATION','TRAVEL','LEARNING','WORK','RELEASE','OTHER']
 const horizon=computed(()=>new Date(Date.now()+range.value*86400000))
@@ -20,28 +22,25 @@ const events=computed(()=>{
  for(const r of data.value?.renewals||[])list.push({id:r.id,date:r.date,end:r.date,title:`${r.title} renews`,detail:money(r.amount),type:'Renewal'})
  for(const i of data.value?.intentions||[])if(i.status==='PLANNED')list.push({id:'i'+i.id,date:i.startDate,end:i.endDate||i.startDate,title:`Plan: ${i.subscription?.name||'Service'}`,detail:i.reason,type:'Intention'})
  const filtered=list.filter(e=>(kindFilter.value==='ALL'||e.type!=='Activity'||e.raw?.kind===kindFilter.value)&&new Date(e.end)>=new Date(new Date().setHours(0,0,0,0))&&new Date(e.date)<=horizon.value).sort((a,b)=>+new Date(a.date)-+new Date(b.date))
- // Google loves firing the same reminder 5x a day. Show it once, with the times.
- const out:any[]=[],seen=new Map<string,any>()
- for(const e of filtered){if(e.type!=='Activity'){out.push(e);continue}const key=e.title.toLowerCase()+'|'+new Date(e.date).toDateString();const first=seen.get(key);if(first){first.count=(first.count||1)+1;first.times.push(new Date(e.date));first.ids.push(e.id)}else{const copy={...e,count:1,times:[new Date(e.date)],ids:[e.id]};seen.set(key,copy);out.push(copy)}}
- for(const e of out)if(e.count>1)e.detail+=` · ×${e.count} (${e.times.map((d:Date)=>d.toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit'})).join(', ')})`
- return out
+ return filtered
 })
 function edit(a?:any){editing.value=a?.id||'';form.value=a?{title:a.title,description:a.description||'',kind:a.kind,startDate:a.startDate.slice(0,10),endDate:a.endDate.slice(0,10)}:{title:'',description:'',kind:'OTHER',startDate:new Date().toISOString().slice(0,10),endDate:new Date().toISOString().slice(0,10)};open.value=true}
 async function save(){busy.value=true;try{await api(`/advisor/activities${editing.value?'/'+editing.value:''}`,{method:editing.value?'PUT':'POST',body:form.value});open.value=false;await refresh();toast.add({title:'Activity saved',color:'success'})}catch(e){toast.add({title:errorMessage(e),color:'error'})}finally{busy.value=false}}
 async function remove(a:any){if(!confirm(`Delete “${a.title}”?`))return;try{await api(`/advisor/activities/${a.id}`,{method:'DELETE'});await refresh()}catch(e){toast.add({title:errorMessage(e),color:'error'})}}
-async function sync(){busy.value=true;try{const r=await api<any>('/calendar/sync',{method:'POST'});msg.value=`Imported ${r.imported} calendar activities.`;await Promise.all([refresh(),refreshCal()])}catch(e){msg.value=errorMessage(e)}finally{busy.value=false}}
+async function sync(){busy.value=true;try{const r=await api<any>('/calendar/sync',{method:'POST'});msg.value=`Imported ${r.imported} activities from ${r.calendars??1} calendar(s).`;await Promise.all([refresh(),refreshCal()])}catch(e){msg.value=errorMessage(e)}finally{busy.value=false}}
 async function disconnect(){busy.value=true;try{await api('/calendar',{method:'DELETE'});msg.value='Calendar disconnected and imported activities removed.';await Promise.all([refresh(),refreshCal()])}catch(e){msg.value=errorMessage(e)}finally{busy.value=false}}
+const autoSynced=ref(false)
+watch(()=>cal.value?.connected,connected=>{if(route.query.calendar_connected&&connected&&!autoSynced.value){autoSynced.value=true;void sync()}},{immediate:true})
 </script>
 <template>
  <div class="page space-y-6">
-  <div class="flex flex-wrap justify-between gap-4"><div><h1 class="text-2xl font-semibold tracking-tight">Your life, your renewals, one timeline</h1></div><UButton icon="i-lucide-plus" @click="edit()">Add activity</UButton></div>
+  <div class="page-head"><div><p class="eyebrow">The bigger picture</p><h1>Calendar</h1><p>Activities, renewal dates and intentions, together.</p></div><UButton icon="i-lucide-plus" @click="edit()">Add activity</UButton></div>
+  <section aria-label="Calendar month view"><ActivityCalendar :events="calEvents"/></section>
   <UAlert v-if="error" color="error" :title="errorMessage(error)"/>
   <UAlert v-if="msg" color="neutral" :title="msg"/>
-  <section class="border-y border-default py-4"><div class="flex flex-wrap justify-between items-center gap-4"><div><p class="font-medium">Google Calendar <UBadge v-if="cal?.connected" color="success" variant="subtle" class="ms-2">Connected</UBadge></p></div><div class="flex gap-2"><UButton v-if="!cal?.connected" to="/api/auth/google?calendar=1" external icon="i-lucide-calendar-plus">Connect Calendar</UButton><template v-else><UButton :loading="busy" icon="i-lucide-refresh-cw" @click="sync">Sync now</UButton><UButton color="error" variant="ghost" :disabled="busy" @click="disconnect">Disconnect</UButton></template></div></div>
+  <section class="border-y border-default py-4"><div class="flex flex-wrap justify-between items-center gap-4"><div><p class="font-medium">Google Calendar <UBadge v-if="cal?.connected" color="success" variant="subtle" class="ms-2">Connected</UBadge></p></div><div class="flex gap-2"><UButton v-if="!cal?.connected" to="/api/auth/google?calendar=1" external icon="i-lucide-calendar-plus">Connect Calendar</UButton><template v-else><UButton to="/api/auth/google?calendar=1" external color="neutral" variant="outline" :disabled="busy">Reconnect</UButton><UButton :loading="busy" icon="i-lucide-refresh-cw" @click="sync">Sync now</UButton><UButton color="error" variant="ghost" :disabled="busy" @click="disconnect">Disconnect</UButton></template></div></div>
 </section>
-  <section><MiniCalendar :events="calEvents" :selected="selectedDay" @select-day="selectedDay=selectedDay===$event?'':$event"/>
-   <div v-if="selectedDay" class="mt-4 border-t border-default pt-3"><p class="text-xs font-medium text-muted">{{new Date(selectedDay).toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'})}} <UButton size="xs" variant="link" @click="selectedDay=''">clear</UButton></p><p v-for="e in dayEvents" :key="e.id" class="text-sm mt-1.5">{{e.title}} <span class="text-muted">· {{e.type.toLowerCase()}}</span></p><p v-if="!dayEvents.length" class="text-sm text-muted mt-1.5">Nothing on this day.</p></div>
-  </section>
+
   <div class="flex flex-wrap items-center gap-2"><span class="text-sm font-semibold me-2">Timeline</span><UButton v-for="r in [{label:'Week',value:7},{label:'Month',value:30},{label:'Quarter',value:90},{label:'Year',value:365}]" :key="r.value" size="sm" :color="range===r.value?'primary':'neutral'" :variant="range===r.value?'soft':'ghost'" @click="range=r.value">{{r.label}}</UButton><span class="text-xs text-muted ms-auto">soonest first · renewals within 7 days flagged</span></div><div class="flex flex-wrap gap-1.5 items-center"><span class="text-xs text-muted me-1">Events:</span><UButton v-for="k in presentKinds" :key="k" size="xs" :color="kindFilter===k?'primary':'neutral'" :variant="kindFilter===k?'soft':'ghost'" @click="kindFilter=k">{{k==='ALL'?'All categories':k.charAt(0)+k.slice(1).toLowerCase()}}</UButton><span class="text-xs text-dimmed ms-2">Wrong category? Tap Correct — syncs keep your fix.</span></div>
   <ol class="relative ms-3 border-s-2 border-default">
    <li v-for="e in events" :key="e.id" class="ms-6 pb-6 relative">

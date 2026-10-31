@@ -1,8 +1,8 @@
 <script setup lang="ts">
 const api=useApi(),toast=useToast()
 interface Rec{key:string;action:string;title:string;reason:string;activity:string|null;financialImpact:string;potentialMonthly:number;ifIgnored:string;subscriptionId:string;date:string|null;priority:number}
-const {data,refresh,error}=await useFetch<any>('/api/advisor/overview')
-const {data:calStatus,refresh:refreshCalStatus}=await useFetch<any>('/api/calendar')
+const {data,refresh,error}=useFetch<any>('/api/advisor/overview')
+const {data:calStatus,refresh:refreshCalStatus}=useFetch<any>('/api/calendar')
 async function syncCal(){try{await useApi()('/calendar/sync',{method:'POST'});await Promise.all([refresh(),refreshCalStatus()]);toast.add({title:'Calendar synced',color:'success'})}catch(e){toast.add({title:errorMessage(e),color:'error'})}}
 const busy=ref(''),expanded=ref('')
 const labels:Record<string,string>={KEEP:'Keep',RECONSIDER:'Review',SUBSCRIBE:'Consider starting',DELAY:'Delay',OVERLAP:'Rotate'}
@@ -21,8 +21,8 @@ const dayEvents=computed(()=>selectedDay.value?calEvents.value.filter(e=>new Dat
 <template>
  <div class="page space-y-6">
   <div class="flex flex-wrap items-end justify-between gap-3">
-   <div><h1 class="text-2xl font-semibold tracking-tight">What needs your attention?</h1></div>
-   <div class="flex gap-5 text-right">
+   <div><p class="text-xs uppercase tracking-widest text-muted mb-3">Your subscription briefing</p><h1>Your subscription overview</h1><p class="text-sm text-muted mt-3 mb-3">Your spending, upcoming plans and next decisions — in one place.</p></div>
+   <div class="advisor-metrics">
     <div><p class="text-xs text-muted">Active / mo</p><p class="text-xl font-semibold tabular-nums">{{data?money(data.totals.monthly):'—'}}</p></div>
     <div><p class="text-xs text-muted">Potential saving*</p><p class="text-xl font-semibold tabular-nums">{{data?money(data.totals.potentialMonthly):'—'}}</p></div>
     <div><p class="text-xs text-muted">Active subs</p><p class="text-xl font-semibold">{{data?.totals.active??'—'}}</p></div>
@@ -33,7 +33,7 @@ const dayEvents=computed(()=>selectedDay.value?calEvents.value.filter(e=>new Dat
    <div v-if="!data.subscriptions.length" class="border-y border-dashed border-default py-5 flex flex-wrap justify-between gap-4 items-center"><div><p class="font-medium">No services yet.</p></div><UButton to="/portal/subscriptions" trailing-icon="i-lucide-arrow-right">Add subscriptions</UButton></div>
    <div class="grid lg:grid-cols-5 gap-6 items-start">
     <section class="lg:col-span-3">
-     <header class="flex items-center justify-between py-3 border-b-2 border-default"><h2 class="font-semibold">Priority actions</h2><span class="text-xs text-muted">{{data.recommendations.length}} · sorted by urgency</span><UButton size="xs" variant="link" to="/portal/recommendations">Timeline view</UButton></header>
+     <header class="flex items-center justify-between py-3 border-b-2 border-default"><h2 class="font-semibold">Priority actions</h2><span class="text-xs text-muted">{{data.recommendations.length}} · sorted by urgency</span><UButton size="xs" variant="link" to="/portal/recommendations">All recommendations</UButton></header>
      <ol class="divide-y divide-default">
       <li v-for="(r,i) in (data.recommendations as Rec[])" :key="r.key" class="py-4 hover:bg-elevated/30">
        <div class="flex gap-4">
@@ -70,12 +70,7 @@ const dayEvents=computed(()=>selectedDay.value?calEvents.value.filter(e=>new Dat
        <UButton v-if="!calStatus?.connected" size="sm" icon="i-lucide-calendar-plus" to="/api/auth/google?calendar=1" external>Connect Calendar</UButton>
        <UButton v-else size="sm" color="neutral" variant="outline" icon="i-lucide-refresh-cw" @click="syncCal">Sync now</UButton>
       </div>
-      <MiniCalendar :events="calEvents" :selected="selectedDay" @select-day="selectedDay=$event"/>
-      <div v-if="selectedDay" class="mt-4 border-t border-default pt-3">
-       <p class="text-xs font-medium text-muted">{{new Date(selectedDay).toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'})}}</p>
-       <p v-for="(e,i) in dayEvents" :key="i" class="text-sm mt-1.5">{{e.title}}</p>
-       <p v-if="!dayEvents.length" class="text-sm text-muted mt-1.5">Nothing scheduled.</p>
-      </div>
+      <UButton to="/portal/timeline" color="neutral" variant="outline" block icon="i-lucide-calendar">Open calendar</UButton>
      </section>
      <section class="border-t border-default pt-2">
       <header class="py-3 flex justify-between items-center"><h2 class="font-semibold">Coming up</h2><UButton size="xs" variant="link" to="/portal/timeline">Full timeline</UButton></header>

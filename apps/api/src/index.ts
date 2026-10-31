@@ -1,0 +1,58 @@
+import 'dotenv/config';
+import cookieParser from 'cookie-parser';
+import express from 'express';
+import { loadUser, requireAuth } from './lib/auth';
+import { startScheduler } from './lib/billing';
+import { loadClock } from './lib/clock';
+import { initDb } from './lib/db';
+import { sseHandler } from './lib/events';
+import { errorHandler, timing } from './lib/http';
+import { aiRouter } from './routes/ai';
+import { authRouter, usersRouter } from './routes/auth';
+import { customersRouter, discountsRouter, plansRouter, productsRouter, taxesRouter } from './routes/catalog';
+import { dashboardRouter } from './routes/dashboard';
+import { billingRouter, invoicesRouter, paymentsRouter, reconcileRouter } from './routes/finance';
+import { portalRouter } from './routes/portal';
+import { renewalsRouter, subscriptionsRouter, templatesRouter } from './routes/subscriptions';
+import { clockRouter, importRouter, outboxRouter } from './routes/tools';
+
+const app = express();
+app.disable('x-powered-by');
+app.set('trust proxy', 'loopback');
+app.use(express.json({ limit: '3mb' }));
+app.use(cookieParser());
+app.use(timing);
+app.use(loadUser);
+
+app.get('/api/health', (_req, res) => res.json({ ok: true }));
+app.get('/api/events', requireAuth, sseHandler);
+app.use('/api/auth', authRouter);
+app.use('/api/users', usersRouter);
+app.use('/api/customers', customersRouter);
+app.use('/api/products', productsRouter);
+app.use('/api/plans', plansRouter);
+app.use('/api/taxes', taxesRouter);
+app.use('/api/discounts', discountsRouter);
+app.use('/api/templates', templatesRouter);
+app.use('/api/subscriptions', subscriptionsRouter);
+app.use('/api/renewals', renewalsRouter);
+app.use('/api/invoices', invoicesRouter);
+app.use('/api/payments', paymentsRouter);
+app.use('/api/billing', billingRouter);
+app.use('/api/reconcile', reconcileRouter);
+app.use('/api/dashboard', dashboardRouter);
+app.use('/api/clock', clockRouter);
+app.use('/api/import', importRouter);
+app.use('/api/outbox', outboxRouter);
+app.use('/api/portal', portalRouter);
+app.use('/api/ai', aiRouter);
+app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
+app.use(errorHandler);
+
+const port = Number(process.env.PORT ?? 4000);
+await initDb();
+await loadClock();
+app.listen(port, () => {
+  console.log(`Brightloop API on http://localhost:${port}`);
+  startScheduler();
+});

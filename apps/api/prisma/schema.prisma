@@ -1,0 +1,272 @@
+// Local SQLite database (offline, zero setup). Switch `provider` to "postgresql" and DATABASE_URL to a
+// Postgres URL to run on Postgres. Enums are stored as strings and validated by @brightloop/shared.
+// Money columns are integer paise.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  name         String
+  passwordHash String
+  role         String // ADMIN | STAFF | CUSTOMER
+  createdAt    DateTime     @default(now())
+  customer     Customer?
+  resetTokens  ResetToken[]
+}
+
+model ResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+}
+
+model Customer {
+  id            String         @id @default(cuid())
+  name          String
+  email         String         @unique
+  company       String?
+  phone         String?
+  address       String?
+  userId        String?        @unique
+  user          User?          @relation(fields: [userId], references: [id])
+  createdAt     DateTime       @default(now())
+  subscriptions Subscription[]
+  invoices      Invoice[]
+
+  @@index([name])
+}
+
+model Product {
+  id         String             @id @default(cuid())
+  name       String
+  type       String // SERVICE | GOODS | ADDON
+  salesPrice Int
+  costPrice  Int
+  notes      String?
+  active     Boolean            @default(true)
+  createdAt  DateTime           @default(now())
+  variants   ProductVariant[]
+  discounts  Discount[]         @relation("DiscountProducts")
+  lines      SubscriptionLine[]
+}
+
+model ProductVariant {
+  id         String  @id @default(cuid())
+  productId  String
+  product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  attribute  String
+  value      String
+  extraPrice Int
+}
+
+model Plan {
+  id            String              @id @default(cuid())
+  name          String
+  interval      String // DAILY | WEEKLY | MONTHLY | YEARLY
+  price         Int // base fee per period (0 = only product lines are billed)
+  minQuantity   Int                 @default(1)
+  startDate     DateTime?
+  endDate       DateTime?
+  autoClose     Boolean             @default(false)
+  closable      Boolean             @default(true)
+  pausable      Boolean             @default(false)
+  renewable     Boolean             @default(true)
+  active        Boolean             @default(true)
+  createdAt     DateTime            @default(now())
+  subscriptions Subscription[]
+  templates     QuotationTemplate[]
+}
+
+model QuotationTemplate {
+  id           String         @id @default(cuid())
+  name         String
+  validityDays Int
+  planId       String
+  plan         Plan           @relation(fields: [planId], references: [id])
+  paymentTerm  String
+  notes        String?
+  lines        TemplateLine[]
+  createdAt    DateTime       @default(now())
+}
+
+model TemplateLine {
+  id         String            @id @default(cuid())
+  templateId String
+  template   QuotationTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  productId  String
+  variantId  String?
+  quantity   Int
+  unitPrice  Int?
+}
+
+model Subscription {
+  id                 String             @id @default(cuid())
+  number             String             @unique
+  customerId         String
+  customer           Customer           @relation(fields: [customerId], references: [id])
+  planId             String
+  plan               Plan               @relation(fields: [planId], references: [id])
+  templateId         String?
+  status             String // DRAFT | QUOTATION | CONFIRMED | ACTIVE | PAUSED | CLOSED
+  startDate          DateTime
+  expiryDate         DateTime?
+  quotationExpiresAt DateTime?
+  paymentTerm        String
+  autoRenew          Boolean            @default(false)
+  notes              String?
+  nextInvoiceDate    DateTime? // start of the next period to bill
+  periodTotal        Int                @default(0) // pre-tax recurring amount per period
+  mrr                Int                @default(0) // periodTotal normalised to a month
+  closedReason       String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  lines              SubscriptionLine[]
+  invoices           Invoice[]
+  discounts          Discount[]         @relation("DiscountSubscriptions")
+
+  @@index([status])
+  @@index([customerId])
+  @@index([expiryDate])
+  @@index([status, nextInvoiceDate])
+}
+
+model SubscriptionLine {
+  id             String       @id @default(cuid())
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  productId      String
+  product        Product      @relation(fields: [productId], references: [id])
+  variantId      String?
+  description    String
+  quantity       Int
+  unitPrice      Int
+}
+
+model Tax {
+  id          String   @id @default(cuid())
+  name        String
+  rate        Float
+  productType String? // null = all products
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
+model Discount {
+  id            String         @id @default(cuid())
+  name          String
+  type          String // PERCENT | FIXED
+  value         Int // percent, or paise for FIXED
+  scope         String // PRODUCT | SUBSCRIPTION
+  minQuantity   Int            @default(0)
+  minAmount     Int            @default(0)
+  startDate     DateTime?
+  endDate       DateTime?
+  usageLimit    Int?
+  usedCount     Int            @default(0)
+  active        Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  products      Product[]      @relation("DiscountProducts")
+  subscriptions Subscription[] @relation("DiscountSubscriptions")
+}
+
+model Invoice {
+  id             String        @id @default(cuid())
+  number         String        @unique
+  subscriptionId String?
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
+  customerId     String
+  customer       Customer      @relation(fields: [customerId], references: [id])
+  status         String // DRAFT | CONFIRMED | PAID | CANCELLED
+  issueDate      DateTime
+  dueDate        DateTime
+  periodStart    DateTime?
+  periodEnd      DateTime?
+  subtotal       Int
+  discountTotal  Int
+  taxTotal       Int
+  total          Int
+  amountPaid     Int           @default(0)
+  sentAt         DateTime?
+  paidAt         DateTime?
+  createdAt      DateTime      @default(now())
+  lines          InvoiceLine[]
+  payments       Payment[]
+
+  // Idempotency key: one invoice per subscription per billing period, ever.
+  @@unique([subscriptionId, periodStart])
+  @@index([status, dueDate])
+  @@index([customerId])
+  @@index([issueDate])
+}
+
+model InvoiceLine {
+  id            String  @id @default(cuid())
+  invoiceId     String
+  invoice       Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  productId     String?
+  description   String
+  quantity      Int
+  unitPrice     Int
+  subtotal      Int
+  discount      Int
+  taxRate       Float
+  tax           Int
+  total         Int
+  discountLabel String?
+  taxLabel      String?
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  invoiceId String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id])
+  method    String
+  amount    Int
+  date      DateTime
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([date])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  entityType String
+  entityId   String
+  action     String
+  detail     String?
+  actorName  String?
+  at         DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+}
+
+model Email {
+  id        String   @id @default(cuid())
+  to        String
+  subject   String
+  body      String
+  createdAt DateTime @default(now())
+}
+
+model Sequence {
+  name  String @id
+  value Int
+}
+
+model AppClock {
+  id       Int    @id @default(1)
+  offsetMs BigInt @default(0)
+}

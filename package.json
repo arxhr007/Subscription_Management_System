@@ -1,0 +1,17 @@
+{
+  "name": "brightloop",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "setup": "npm run db:setup -w apps/api",
+    "dev": "concurrently -n api,web -c magenta,cyan \"npm run dev -w apps/api\" \"npm run dev -w apps/web\"",
+    "test": "vitest run",
+    "typecheck": "tsc -p packages/shared && tsc -p apps/api && tsc -p apps/web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.8.3",
+    "vitest": "^5.0.5"
+  }
+}

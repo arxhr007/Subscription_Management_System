@@ -17,6 +17,6 @@ export function allocate(total: number, weights: number[]): number[] {
   const parts = raw.map(Math.floor);
   let rest = total - parts.reduce((a, b) => a + b, 0);
   const order = raw.map((r, i) => [r - Math.floor(r), i] as const).sort((a, b) => b[0] - a[0]);
-  for (let k = 0; rest > 0; k = (k + 1) % order.length, rest--) parts[order[k][1]]++;
+  for (let k = 0; rest > 0; k = (k + 1) % order.length, rest--) { const index = order[k]![1]; parts[index] = (parts[index] ?? 0) + 1; }
   return parts;
 }

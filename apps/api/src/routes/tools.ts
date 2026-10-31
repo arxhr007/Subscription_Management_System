@@ -1,4 +1,4 @@
-// Time Machine, spreadsheet import and the local Outbox.
+// Time Machine, spreadsheet import.
 import { Router } from 'express';
 import { z } from 'zod';
 import { addInterval, clockAdvanceSchema, csvToObjects, PAYMENT_TERM_KEYS, toCents, zEmail, type Interval } from '@brightloop/shared';
@@ -19,6 +19,7 @@ export const clockRouter = Router();
 clockRouter.get('/', requireAuth, (_req, res) => res.json({ now: now(), offsetDays: Math.round(clockOffsetMs() / DAY) }));
 
 clockRouter.post('/advance', adminOnly, async (req, res) => {
+  if (process.env.ENABLE_TIME_MACHINE !== 'true') throw new HttpError(403, 'Time Machine is disabled');
   const { days } = parse(clockAdvanceSchema, req.body);
   const before = now();
   await setClockOffset(clockOffsetMs() + days * DAY);
@@ -103,15 +104,4 @@ importRouter.post('/subscriptions', async (req, res) => {
   }
   broadcast('subscriptions', 'customers');
   res.json({ total: rows.length, created, skipped: rows.length - created });
-});
-
-// ---------- Outbox (local mailbox) ----------
-
-export const outboxRouter = Router();
-const publicMailbox = process.env.DEV_MAILBOX_PUBLIC === 'true' && process.env.NODE_ENV !== 'production';
-
-outboxRouter.get('/', publicMailbox ? (_req, _res, next) => next() : adminOnly, async (req, res) => {
-  const to = typeof req.query.to === 'string' ? req.query.to.slice(0, 120) : undefined;
-  const items = await prisma.email.findMany({ where: to ? { to: { contains: to } } : {}, orderBy: { createdAt: 'desc' }, take: 100 });
-  res.json({ items, public: publicMailbox });
 });

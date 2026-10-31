@@ -32,8 +32,8 @@ export const AUTO_MATCH_SCORE = 80;
 /** Best candidates for a line, highest score first. Auto-match only when the top one clears the bar and is unambiguous. */
 export function rankMatches(line: BankLine, invoices: OpenInvoice[], limit = 3) {
   const ranked = invoices.map((inv) => scoreMatch(line, inv)).filter((c) => c.score > 0).sort((a, b) => b.score - a.score).slice(0, limit);
-  const auto = ranked.length > 0 && ranked[0].score >= AUTO_MATCH_SCORE && (ranked.length === 1 || ranked[1].score < ranked[0].score);
-  return { candidates: ranked, autoInvoiceId: auto ? ranked[0].invoiceId : null };
+  const auto = ranked.length > 0 && ranked[0]!.score >= AUTO_MATCH_SCORE && (ranked.length === 1 || ranked[1]!.score < ranked[0]!.score);
+  return { candidates: ranked, autoInvoiceId: auto ? ranked[0]!.invoiceId : null };
 }
 
 /** Minimal RFC-4180 CSV parser (quoted fields, escaped quotes, CRLF). Returns rows of string cells. */

@@ -11,7 +11,6 @@ import { now } from '../lib/clock';
 import { nextNumber, prisma, type Tx } from '../lib/db';
 import { broadcast } from '../lib/events';
 import { HttpError, notFound, paging, parse } from '../lib/http';
-import { sendMail } from '../lib/mail';
 
 type LineInput = { productId: string; variantId: string | null; quantity: number; unitPrice: number | null };
 
@@ -186,10 +185,6 @@ export async function transitionSubscription(id: string, to: SubStatus, actor: s
     }
   });
 
-  if (to === 'QUOTATION') {
-    await sendMail(sub.customer.email, `Your Brightloop quotation ${sub.number}`,
-      `Hi ${sub.customer.name},\n\nYour quotation ${sub.number} for the ${sub.plan.name} plan is ready. Sign in to your portal to review and accept it.\n\nBrightloop Software`);
-  }
   broadcast('subscriptions');
 }
 

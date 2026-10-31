@@ -12,9 +12,11 @@ import { authRouter, usersRouter } from './routes/auth';
 import { customersRouter, discountsRouter, plansRouter, productsRouter, taxesRouter } from './routes/catalog';
 import { dashboardRouter } from './routes/dashboard';
 import { billingRouter, invoicesRouter, paymentsRouter, reconcileRouter } from './routes/finance';
+import { gmailRouter } from './routes/gmail';
+import { externalRouter } from './routes/external';
 import { portalRouter } from './routes/portal';
 import { renewalsRouter, subscriptionsRouter, templatesRouter } from './routes/subscriptions';
-import { clockRouter, importRouter, outboxRouter } from './routes/tools';
+import { clockRouter, importRouter } from './routes/tools';
 
 const app = express();
 app.disable('x-powered-by');
@@ -22,6 +24,14 @@ app.set('trust proxy', 'loopback');
 app.use(express.json({ limit: '3mb' }));
 app.use(cookieParser());
 app.use(timing);
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store');
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+    const origin = req.get('origin');
+    if (origin && origin !== (process.env.WEB_ORIGIN ?? 'http://localhost:3000')) return res.status(403).json({ error: 'Origin not allowed' });
+  }
+  next();
+});
 app.use(loadUser);
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
@@ -43,8 +53,9 @@ app.use('/api/reconcile', reconcileRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/clock', clockRouter);
 app.use('/api/import', importRouter);
-app.use('/api/outbox', outboxRouter);
 app.use('/api/portal', portalRouter);
+app.use('/api/external-subscriptions', externalRouter);
+app.use('/api/gmail', gmailRouter);
 app.use('/api/ai', aiRouter);
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
 app.use(errorHandler);
@@ -54,5 +65,5 @@ await initDb();
 await loadClock();
 app.listen(port, () => {
   console.log(`Brightloop API on http://localhost:${port}`);
-  startScheduler();
+  if (process.env.RUN_SCHEDULER === 'true') startScheduler();
 });

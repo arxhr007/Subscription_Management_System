@@ -1,0 +1,1 @@
+<template><InvoiceDetail portal /></template>

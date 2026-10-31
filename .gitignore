@@ -5,3 +5,15 @@ dist
 *.db-wal
 *.db-shm
 .env
+
+.nuxt
+.output
+.env.*
+!.env.example
+.supabase
+playwright-report
+test-results
+
+supabase/.temp/
+
+apps/api/admin-login.txt

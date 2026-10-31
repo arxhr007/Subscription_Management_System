@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 // Invoices, payments, the billing run and bank-statement reconciliation.
 import { Router } from 'express';
 import { z } from 'zod';
@@ -9,7 +10,6 @@ import { now } from '../lib/clock';
 import { prisma, type Tx } from '../lib/db';
 import { broadcast } from '../lib/events';
 import { HttpError, notFound, paging, parse } from '../lib/http';
-import { sendMail } from '../lib/mail';
 
 // ---------- Shared helpers (also used by the portal) ----------
 
@@ -23,7 +23,16 @@ export async function invoiceDetail(id: string) {
   return { ...inv, amountDue: inv.total - inv.amountPaid, overdue: inv.status === 'CONFIRMED' && inv.dueDate < at, now: at };
 }
 
-export async function recordPayment(tx: Tx, p: { invoiceId: string; method: string; amount: number; date: Date; note: string | null }, actor: string) {
+export async function recordPayment(tx: Tx, p: { invoiceId: string; method: string; amount: number; date: Date; note: string | null; idempotencyKey?: string }, actor: string) {
+  await tx.$queryRaw`SELECT id FROM "Invoice" WHERE id = ${p.invoiceId} FOR UPDATE`;
+  if (p.idempotencyKey) {
+    const previous = await tx.payment.findUnique({ where: { idempotencyKey: p.idempotencyKey } });
+    if (previous) {
+      if (previous.invoiceId !== p.invoiceId || previous.amount !== p.amount || previous.method !== p.method) throw new HttpError(409, 'Payment key was already used for different details');
+      return previous;
+    }
+  }
+  if (!Number.isSafeInteger(p.amount) || p.amount <= 0) throw new HttpError(400, 'Payment must be a positive amount');
   const inv = await tx.invoice.findUnique({ where: { id: p.invoiceId } });
   if (!inv) throw notFound('Invoice');
   if (inv.status !== 'CONFIRMED') throw new HttpError(409, inv.status === 'PAID' ? 'This invoice is already paid' : 'Confirm the invoice before recording a payment');
@@ -94,22 +103,21 @@ invoicesRouter.post('/:id/cancel', async (req, res) => {
   res.json(await invoiceDetail(req.params.id));
 });
 
-invoicesRouter.post('/:id/send', async (req, res) => {
-  const inv = await invoiceDetail(req.params.id);
-  if (inv.status === 'DRAFT' || inv.status === 'CANCELLED') throw new HttpError(409, 'Confirm the invoice before sending it');
-  const lines = inv.lines.map((l) => `  • ${l.description} × ${l.quantity}: ${formatMoney(l.total)}`).join('\n');
-  await sendMail(inv.customer.email, `Invoice ${inv.number} from Brightloop`,
-    `Hi ${inv.customer.name},\n\nInvoice ${inv.number}\n${lines}\n\nTotal: ${formatMoney(inv.total)}\nAmount due: ${formatMoney(inv.amountDue)} by ${inv.dueDate.toISOString().slice(0, 10)}\n\nView and pay it in your Brightloop portal.`);
-  await prisma.invoice.update({ where: { id: inv.id }, data: { sentAt: now() } });
-  await audit(prisma, 'invoice', inv.id, 'Sent', inv.customer.email, req.user!.name);
-  broadcast('invoices');
-  res.json(await invoiceDetail(inv.id));
-});
 
 // ---------- Billing run ----------
 
 export const billingRouter = Router();
 billingRouter.use(staffOnly);
+
+billingRouter.get('/preview', async (_req,res) => {
+  const at = now();
+  const [due, drafts, confirmed] = await Promise.all([
+    prisma.subscription.count({where:{status:'ACTIVE',nextInvoiceDate:{lte:at},OR:[{expiryDate:null},{expiryDate:{gt:prisma.subscription.fields.nextInvoiceDate}}]}}),
+    prisma.invoice.count({where:{status:'DRAFT'}}),
+    prisma.subscription.count({where:{status:'CONFIRMED',startDate:{lte:at}}}),
+  ]);
+  res.json({dueSubscriptions:due,draftInvoices:drafts,awaitingActivation:confirmed,asOf:at});
+});
 
 billingRouter.post('/run', async (req, res) => {
   const summary = await runAllJobs(req.user!.name);
@@ -140,7 +148,8 @@ paymentsRouter.get('/', async (req, res) => {
 
 paymentsRouter.post('/', async (req, res) => {
   const d = parse(paymentSchema, req.body);
-  const p = await prisma.$transaction((tx) => recordPayment(tx, d, req.user!.name));
+  const idempotencyKey = parse(z.string().uuid(), req.get('Idempotency-Key'));
+  const p = await prisma.$transaction((tx) => recordPayment(tx, { ...d, idempotencyKey }, req.user!.name));
   broadcast('payments', 'invoices');
   res.status(201).json(p);
 });
@@ -170,19 +179,19 @@ reconcileRouter.post('/preview', async (req, res) => {
     if (Number.isNaN(date.getTime())) return { ...base, error: 'Unreadable date', candidates: [], autoInvoiceId: null };
     if (!Number.isFinite(amountNum) || amountNum <= 0) return { ...base, error: 'Not a credit (amount must be positive)', candidates: [], autoInvoiceId: null };
     const { candidates, autoInvoiceId } = rankMatches(base, openInvoices);
-    return { ...base, error: null, autoInvoiceId, candidates: candidates.map((c) => ({ ...c, ...byId.get(c.invoiceId)! })) };
+    return { ...base, idempotencyKey: createHash('sha256').update(JSON.stringify([base.date, base.reference, base.description, base.amount])).digest('hex'), error: null, autoInvoiceId, candidates: candidates.map((c) => ({ ...c, ...byId.get(c.invoiceId)! })) };
   });
   res.json({ rows: out, openInvoices: openInvoices.length });
 });
 
 reconcileRouter.post('/confirm', async (req, res) => {
   const { matches } = parse(z.object({
-    matches: z.array(z.object({ invoiceId: z.string(), amount: z.number().int().positive(), date: z.coerce.date(), description: z.string().max(300).default('') })).min(1).max(1000),
+    matches: z.array(z.object({ invoiceId: z.string(), idempotencyKey: z.string().regex(/^[a-f0-9]{64}$/), amount: z.number().int().positive(), date: z.coerce.date(), description: z.string().max(300).default('') })).min(1).max(1000),
   }), req.body);
   const results: { invoiceId: string; ok: boolean; error?: string }[] = [];
   for (const m of matches) {
     try {
-      await prisma.$transaction((tx) => recordPayment(tx, { invoiceId: m.invoiceId, method: 'BANK_TRANSFER', amount: m.amount, date: m.date, note: `Bank statement: ${m.description}`.slice(0, 500) }, req.user!.name));
+      await prisma.$transaction((tx) => recordPayment(tx, { idempotencyKey: `bank:${m.idempotencyKey}`, invoiceId: m.invoiceId, method: 'BANK_TRANSFER', amount: m.amount, date: m.date, note: `Bank statement: ${m.description}`.slice(0, 500) }, req.user!.name));
       results.push({ invoiceId: m.invoiceId, ok: true });
     } catch (e) {
       results.push({ invoiceId: m.invoiceId, ok: false, error: e instanceof HttpError ? e.message : 'Failed' });

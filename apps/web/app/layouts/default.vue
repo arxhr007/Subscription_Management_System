@@ -5,14 +5,12 @@ const route=useRoute()
 const colorMode=useColorMode()
 const sidebarOpen=ref(false)
 watch(()=>route.path,()=>{sidebarOpen.value=false})
-const titles:Record<string,string>={'/portal':'Advisor','/portal/timeline':'Timeline','/portal/subscriptions':'Subscriptions','/portal/plans':'Plans & intentions','/portal/spending':'Spending','/portal/preferences':'Preferences','/portal/onboarding':'Welcome'}
+const titles:Record<string,string>={'/portal':'Advisor','/portal/timeline':'Timeline','/portal/subscriptions':'Subscriptions','/portal/preferences':'Preferences','/portal/onboarding':'Welcome'}
 const title=computed(()=>titles[route.path]||'Advisor')
 const items=[[
  {label:'Advisor',icon:'i-lucide-sparkles',to:'/portal',exact:true},
  {label:'Timeline',icon:'i-lucide-calendar-range',to:'/portal/timeline'},
  {label:'Subscriptions',icon:'i-lucide-repeat',to:'/portal/subscriptions'},
- {label:'Plans & intentions',icon:'i-lucide-target',to:'/portal/plans'},
- {label:'Spending',icon:'i-lucide-wallet',to:'/portal/spending'},
  {label:'Preferences',icon:'i-lucide-settings-2',to:'/portal/preferences'}
 ]]
 const searchGroups=computed(()=>[{id:'navigation',label:'Go to',items:items.flat()}])

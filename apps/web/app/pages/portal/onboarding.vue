@@ -39,7 +39,7 @@ async function finish(skipSubs=false){
    for(const subName of Object.keys(picked.value)){
     if(have.has(subName.toLowerCase()))continue
     const c=common.find(x=>x.name===subName)
-    await api('/external-subscriptions',{method:'POST',body:{name:subName,amount:0,interval:'MONTHLY',nextRenewal:renewal,status:'ACTIVE',category:c?.category||'Other',usage:'UNKNOWN',importance:3,purpose:'',managementUrl:'',notes:'Added in setup. Amount and renewal date not confirmed yet — update anytime in Subscriptions.'}})
+    await api('/external-subscriptions',{method:'POST',body:{name:subName,amount:0,interval:'MONTHLY',nextRenewal:renewal,status:'ACTIVE',category:c?.category||'Other',usage:'UNKNOWN',importance:3,purpose:'',managementUrl:'',notes:'Added in setup.'}})
    }
   }
   useState('onboarded:'+user.value!.id).value=true
@@ -51,7 +51,7 @@ async function finish(skipSubs=false){
  <div class="page max-w-xl mx-auto py-4">
   <div class="text-center space-y-1.5 mb-6">
    <h1 class="text-2xl font-semibold tracking-tight">Quick setup</h1>
-   <p class="text-sm text-muted">One card at a time. Tap through — done in 30 seconds.</p>
+   
   </div>
   <UAlert v-if="err" color="error" :title="err" class="mb-4"/>
   <!-- deck: current card on top, next cards peeking behind -->
@@ -68,13 +68,13 @@ async function finish(skipSubs=false){
      <p class="text-3xl" aria-hidden="true">👋</p>
      <h2 class="text-xl font-semibold">What should we call you?</h2>
      <UInput v-model="name" size="xl" placeholder="Your name" autofocus class="w-full" @keyup.enter="name.trim().length>=2&&next()"/>
-     <p class="text-xs text-muted">Only this card is required. Everything else is skippable.</p>
+     
     </div>
     <!-- 2 · role -->
     <div v-else-if="cards[card]==='role'" class="flex-1 flex flex-col justify-center space-y-4 py-6">
      <p class="text-3xl" aria-hidden="true">🎓</p>
      <h2 class="text-xl font-semibold">I am a…</h2>
-     <p class="text-sm text-muted -mt-2">Tap one — it moves you to the next card.</p>
+     
      <div class="grid grid-cols-2 gap-3">
       <button v-for="o in [{label:'Student',icon:'🎒',value:'STUDENT'},{label:'Professional',icon:'💼',value:'PROFESSIONAL'},{label:'Freelancer / creator',icon:'🎨',value:'FREELANCER'},{label:'Other',icon:'✨',value:'OTHER'}]" :key="o.value" class="rounded-xl border p-4 text-left transition-colors" :class="occupation===o.value?'border-primary bg-primary/10':'border-default hover:bg-elevated/60'" @click="pickRole(o.value)"><span class="text-2xl block" aria-hidden="true">{{o.icon}}</span><span class="text-sm font-medium block mt-2">{{o.label}}</span></button>
      </div>
@@ -83,7 +83,7 @@ async function finish(skipSubs=false){
     <div v-else-if="cards[card]==='subs'" class="flex-1 flex flex-col justify-center space-y-4 py-6">
      <p class="text-3xl" aria-hidden="true">📺</p>
      <h2 class="text-xl font-semibold">Which of these do you pay for?</h2>
-     <p class="text-sm text-muted -mt-2">Tap all that apply — or none. Add prices later in Subscriptions only if you want to.</p>
+     <p class="text-sm text-muted -mt-2">Tap all that apply — or none.</p>
      <div class="flex flex-wrap gap-2">
       <UButton v-for="c in common" :key="c.name" size="lg" :color="c.name in picked?'primary':'neutral'" :variant="c.name in picked?'solid':'outline'" :icon="c.name in picked?'i-lucide-check':undefined" @click="toggle(c.name)">{{c.name}}</UButton>
      </div>
@@ -93,7 +93,7 @@ async function finish(skipSubs=false){
     <div v-else-if="cards[card]==='interests'" class="flex-1 flex flex-col justify-center space-y-4 py-6">
      <p class="text-3xl" aria-hidden="true">🎯</p>
      <h2 class="text-xl font-semibold">Into any of these?</h2>
-     <p class="text-sm text-muted -mt-2">Optional. Helps us time advice around your life.</p>
+     
      <div class="flex flex-wrap gap-2">
       <UButton v-for="i in interestOptions" :key="i" size="lg" :color="interests.includes(i)?'primary':'neutral'" :variant="interests.includes(i)?'solid':'outline'" :icon="interests.includes(i)?'i-lucide-check':undefined" @click="toggleInterest(i)">{{i}}</UButton>
      </div>
@@ -102,7 +102,7 @@ async function finish(skipSubs=false){
     <div v-else-if="cards[card]==='budget'" class="flex-1 flex flex-col justify-center space-y-4 py-6">
      <p class="text-3xl" aria-hidden="true">🏁</p>
      <h2 class="text-xl font-semibold">Last one — monthly budget?</h2>
-     <p class="text-sm text-muted -mt-2">Optional. We'll flag it when active subscriptions go over. No payments, no auto-cancel — ever.</p>
+     <p class="text-sm text-muted -mt-2">Optional.</p>
      <UInput v-model="budget" type="number" min="0" step="0.01" size="xl" placeholder="e.g. 1500  (₹ per month)" class="w-full"/>
     </div>
     <!-- nav -->

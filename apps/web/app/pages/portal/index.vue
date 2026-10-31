@@ -5,7 +5,7 @@ const {data,refresh,error}=await useFetch<any>('/api/advisor/overview')
 const {data:calStatus,refresh:refreshCalStatus}=await useFetch<any>('/api/calendar')
 async function syncCal(){try{await useApi()('/calendar/sync',{method:'POST'});await Promise.all([refresh(),refreshCalStatus()]);toast.add({title:'Calendar synced',color:'success'})}catch(e){toast.add({title:errorMessage(e),color:'error'})}}
 const busy=ref(''),expanded=ref('')
-const labels:Record<string,string>={KEEP:'Keep',RECONSIDER:'Review',SUBSCRIBE:'Consider starting',DELAY:'Delay',OVERLAP:'Compare'}
+const labels:Record<string,string>={KEEP:'Keep',RECONSIDER:'Review',SUBSCRIBE:'Consider starting',DELAY:'Delay',OVERLAP:'Rotate'}
 const colors:Record<string,string>={KEEP:'success',RECONSIDER:'warning',SUBSCRIBE:'primary',DELAY:'neutral',OVERLAP:'neutral'}
 const prio=(p:number)=>p>=85?{label:'Urgent',color:'error'}:p>=60?{label:'Soon',color:'warning'}:p>=40?{label:'Planned',color:'primary'}:{label:'Low',color:'neutral'}
 async function feedback(key:string,action:string){busy.value=key+action;try{await api('/advisor/feedback',{method:'POST',body:{recommendationKey:key,action}});await refresh();toast.add({title:action==='HELPFUL'?'Thanks — noted':'Advice updated',color:'success'})}catch(e){toast.add({title:errorMessage(e),color:'error'})}finally{busy.value=''}}
@@ -21,7 +21,7 @@ const dayEvents=computed(()=>selectedDay.value?calEvents.value.filter(e=>new Dat
 <template>
  <div class="page space-y-6">
   <div class="flex flex-wrap items-end justify-between gap-3">
-   <div><h1 class="text-2xl font-semibold tracking-tight">What needs your attention?</h1><p class="text-sm text-muted mt-1">Ranked by urgency — renewals first, ideas last. You decide at the provider; nothing changes automatically.</p></div>
+   <div><h1 class="text-2xl font-semibold tracking-tight">What needs your attention?</h1></div>
    <div class="flex gap-5 text-right">
     <div><p class="text-xs text-muted">Active / mo</p><p class="text-xl font-semibold tabular-nums">{{data?money(data.totals.monthly):'—'}}</p></div>
     <div><p class="text-xs text-muted">Potential saving*</p><p class="text-xl font-semibold tabular-nums">{{data?money(data.totals.potentialMonthly):'—'}}</p></div>
@@ -30,7 +30,7 @@ const dayEvents=computed(()=>selectedDay.value?calEvents.value.filter(e=>new Dat
   </div>
   <UAlert v-if="error" color="error" :title="errorMessage(error)"><template #actions><UButton @click="refresh()">Try again</UButton></template></UAlert>
   <template v-if="data">
-   <div v-if="!data.subscriptions.length" class="border-y border-dashed border-default py-5 flex flex-wrap justify-between gap-4 items-center"><div><p class="font-medium">No services yet — graphs and advice appear once you add a few.</p><p class="text-sm text-muted mt-1">Add what you pay for, or find subscriptions from Gmail receipts.</p></div><UButton to="/portal/subscriptions" trailing-icon="i-lucide-arrow-right">Add subscriptions</UButton></div>
+   <div v-if="!data.subscriptions.length" class="border-y border-dashed border-default py-5 flex flex-wrap justify-between gap-4 items-center"><div><p class="font-medium">No services yet.</p></div><UButton to="/portal/subscriptions" trailing-icon="i-lucide-arrow-right">Add subscriptions</UButton></div>
    <div class="grid lg:grid-cols-5 gap-6 items-start">
     <section class="lg:col-span-3">
      <header class="flex items-center justify-between py-3 border-b-2 border-default"><h2 class="font-semibold">Priority actions</h2><span class="text-xs text-muted">{{data.recommendations.length}} · sorted by urgency</span></header>
@@ -47,7 +47,7 @@ const dayEvents=computed(()=>selectedDay.value?calEvents.value.filter(e=>new Dat
          <button class="font-medium text-left mt-1.5 hover:text-primary" @click="expanded=expanded===r.key?'':r.key">{{r.title}} <UIcon :name="expanded===r.key?'i-lucide-chevron-up':'i-lucide-chevron-down'" class="size-4 align-middle text-dimmed"/></button>
          <p class="text-sm text-muted leading-6 mt-1">{{r.reason}}</p>
          <div v-if="expanded===r.key" class="grid sm:grid-cols-2 gap-3 text-sm mt-3">
-          <div><p class="text-xs font-medium text-muted mb-1">Financial impact</p>{{r.financialImpact}}<span v-if="r.potentialMonthly" class="block mt-1 font-medium">Potential: {{money(r.potentialMonthly)}}/mo if you act — not counted as saved.</span></div>
+          <div><p class="text-xs font-medium text-muted mb-1">Financial impact</p>{{r.financialImpact}}<span v-if="r.potentialMonthly" class="block mt-1 font-medium">Potential: {{money(r.potentialMonthly)}}/mo</span></div>
           <div><p class="text-xs font-medium text-muted mb-1">If you ignore this</p>{{r.ifIgnored}}</div>
          </div>
          <div class="flex flex-wrap gap-1.5 mt-3">
@@ -90,7 +90,7 @@ const dayEvents=computed(()=>selectedDay.value?calEvents.value.filter(e=>new Dat
      </section>
     </div>
    </div>
-   <p class="text-xs text-dimmed">*Potential saving is an estimate from services flagged for review. It is not money saved until you actually change a plan.</p>
+   <p class="text-xs text-dimmed">*Potential = estimate, not saved money.</p>
   </template>
  </div>
 </template>

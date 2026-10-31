@@ -69,3 +69,14 @@ Verification limited at user request: no further broad test runs.
 - [x] Review existing services as updates instead of duplicate records.
 - [x] Recognize additional recurring-billing senders; uncertain amounts require review.
 - [ ] Customer grants Gmail access and runs a live mailbox scan.
+
+## Customer UX redesign
+- [x] Unified subscription landing page at /portal; removed internal/external navigation labels.
+- [x] Inbox onboarding → scan progress → discoveries → review → management list.
+- [x] Search and status filters; detail-first management drawer and separate editing.
+- [x] Connection settings moved out of the main content; manual entry remains optional.
+- [x] Existing invoice access under Billing; old tracker URL redirects to the landing page.
+- [x] Build/typecheck and focused onboarding/list/detail visual checks passed.
+
+## New product supersedes the checklists above
+Read HANDOFF.md, PRODUCT_VISION.md and PLAN.md. Implement the Personal Subscription Intelligence Advisor; the current pivot is unfinished and unverified. Migration 004 is pending, and onboarding/advisor/timeline/intentions/preferences UI still need implementation.

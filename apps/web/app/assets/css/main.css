@@ -5,7 +5,7 @@
 @import '@fontsource/public-sans/700.css';
 @import '@nuxt/ui';
 body { margin: 0; }
-.page { max-width: none; width: 100%; margin: auto; padding: 0; }
+.page { max-width: none; width: 100%; margin: 0 auto; padding: 0; }
 .page-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.75rem; }
 .page-head h1 { font-size: 1.5rem; font-weight: 650; letter-spacing: -.035em; }
 .page-head p { color: var(--ui-text-muted); margin-top: .35rem; font-size: .875rem; }

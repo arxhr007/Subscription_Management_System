@@ -7,11 +7,15 @@ export const externalSubscriptionSchema = z.object({
   name: z.string().trim().min(2).max(100),
   amount: zMoney('Amount'),
   interval: z.enum(['MONTHLY', 'YEARLY', 'WEEKLY']),
-  nextRenewal: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD').refine(s => !Number.isNaN(Date.parse(s)) && new Date(s).toISOString().slice(0,10) === s, 'Invalid date'),
-  status: z.enum(['ACTIVE', 'CANCELLED']).default('ACTIVE'),
+  nextRenewal: z.preprocess(v=>v===''||v==null?null:v,z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD').refine(s => !Number.isNaN(Date.parse(s)) && new Date(s).toISOString().slice(0,10) === s, 'Invalid date').nullable()),
+  status: z.enum(['ACTIVE','PLANNED','INTERESTED','INACTIVE','CANCELLED']).default('ACTIVE'),
+  category:z.string().trim().min(1).max(60).default('Other'),
+  usage:z.enum(['UNKNOWN','HIGH','MEDIUM','LOW']).default('UNKNOWN'),
+  importance:z.coerce.number().int().min(1).max(5).default(3),
+  purpose:z.string().max(1000).default(''),
   managementUrl: z.union([z.literal(''), z.url().refine(s => new URL(s).protocol === 'https:', 'Use an HTTPS link')]).default(''),
   notes: z.string().trim().max(1000).default(''),
-});
+}).refine(d=>d.status!=='ACTIVE'||d.nextRenewal!==null,{path:['nextRenewal'],message:'Add the next renewal date for an active subscription'});
 const providers = [
   { name: 'Netflix', match: /\bnetflix\b/i, managementUrl: 'https://www.netflix.com/YourAccount' },
   { name: 'Amazon Prime', match: /\bamazon\s*prime\b|\bprime\s*video\b/i, managementUrl: 'https://www.amazon.in/prime' },

@@ -7,13 +7,13 @@ const sidebarOpen=ref(false)
 watch(()=>route.path,()=>{sidebarOpen.value=false})
 const months=useState('reporting-months',()=>6),planId=useState('reporting-plan',()=>'')
 const simulation=useState('billing-simulation',()=>false)
-const {data:plans}=await useFetch<{items:{id:string;name:string}[]}>('/api/plans')
-const title=computed(()=>route.path==='/'?'Home':route.path.split('/').filter(Boolean).at(-1)?.replace(/-/g,' ')||'Home')
+const {data:plans}=await useFetch<{items:{id:string;name:string}[]}>('/api/plans',{immediate:user.value?.role!=='CUSTOMER'})
+const title=computed(()=>route.path==='/portal'?'Subscriptions':route.path==='/portal/billing'?'Billing':route.path==='/'?'Home':route.path.split('/').filter(Boolean).at(-1)?.replace(/-/g,' ')||'Home')
 const searchGroups=computed(()=>[{id:'navigation',label:'Go to',items:items.value.flat().filter(i=>'to' in i)}])
 const userItems=computed(()=>[[{type:'label' as const,label:user.value?.name||'Account'}],[{label:'Light mode',icon:'i-lucide-sun',onSelect:()=>{colorMode.preference='light'}},{label:'Dark mode',icon:'i-lucide-moon',onSelect:()=>{colorMode.preference='dark'}}],[{label:'Sign out',icon:'i-lucide-log-out',onSelect:()=>signOut()}]])
 const items = computed(() => user.value?.role === 'CUSTOMER' ? [[
-  { label:'My workspace',icon:'i-lucide-house',to:'/portal',exact:true },
-  { label:'External subscriptions',icon:'i-lucide-wallet-cards',to:'/portal/external' }
+  {label:'Subscriptions',icon:'i-lucide-layers',to:'/portal',exact:true},
+  {label:'Billing',icon:'i-lucide-receipt',to:'/portal/billing'}
 ]] : [
   [{label:'Overview',icon:'i-lucide-layout-dashboard',to:'/',exact:true}],
   [{label:'Revenue operations',type:'label' as const},

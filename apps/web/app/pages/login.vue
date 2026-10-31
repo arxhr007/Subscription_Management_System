@@ -19,7 +19,7 @@ async function completeGoogle(reason?: string) {
   finishing=true
   try {
     const user=await refresh()
-    if(user) { stopGoogle(); popup?.close(); await navigateTo(user.role==='CUSTOMER'?'/portal':'/') }
+    if(user) { stopGoogle(); popup?.close(); await navigateTo('/portal') }
   } catch { /* Wait for completion or show the timeout below. */ }
   finally { finishing=false }
 }
@@ -46,7 +46,7 @@ onUnmounted(()=>{stopGoogle();window.removeEventListener('message',onGoogleMessa
 
 async function submit() {
   busy.value = true; error.value = ''
-  try { await useApi()('/auth/login', { method: 'POST', body: state }); const user = await refresh(); await navigateTo(user?.role === 'CUSTOMER' ? '/portal' : '/') }
+  try { await useApi()('/auth/login', { method: 'POST', body: state }); const user = await refresh(); await navigateTo('/portal') }
   catch(e) { error.value = errorMessage(e) } finally { busy.value = false }
 }
 </script>

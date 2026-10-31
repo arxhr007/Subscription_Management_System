@@ -45,8 +45,8 @@ test('customer discovers subscriptions from Gmail without uploading files',async
  await page.route('**/api/gmail/scan',r=>{batches++;return r.fulfill({json:{scanned:30,nextPageToken:batches===1?'next-page':null,candidates:[{name:'Netflix',amount:649,interval:'MONTHLY',nextRenewal:'2026-12-01',status:'ACTIVE',managementUrl:'https://www.netflix.com/YourAccount',notes:'',confidence:'NEEDS_REVIEW',receiptDate:'2026-10-01',evidence:'Receipt found. Review before saving.'}]}})});
  await page.route('**/api/external-subscriptions',r=>r.fulfill({json:{items:[],totals:{active:0,monthly:0,yearly:0}}}));
  await page.goto('/portal/external');await expect(page.locator('input[type=file]')).toHaveCount(0);
- await page.getByRole('button',{name:'Scan mailbox'}).click();await expect(page.getByText(/60 emails checked/)).toBeVisible();
- await page.getByRole('button',{name:'Review & add'}).click();await expect(page.getByLabel('Service name')).toHaveValue('Netflix');expect(batches).toBe(2);
+ await page.getByRole('button',{name:'Find my subscriptions'}).click();await expect(page.getByText(/60 emails checked/)).toBeVisible();
+ await page.getByRole('button',{name:/Netflix/}).click();await expect(page.getByLabel('Subscription name')).toHaveValue('Netflix');expect(batches).toBe(2);
 });
 
 test('Google login opens a branded popup and completes in the original window',async({page})=>{

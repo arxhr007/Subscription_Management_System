@@ -7,6 +7,8 @@ import { loadClock } from './lib/clock';
 import { initDb } from './lib/db';
 import { sseHandler } from './lib/events';
 import { errorHandler, timing } from './lib/http';
+import { calendarRouter } from './routes/calendar';
+import { advisorRouter } from './routes/advisor';
 import { aiRouter } from './routes/ai';
 import { authRouter, usersRouter } from './routes/auth';
 import { customersRouter, discountsRouter, plansRouter, productsRouter, taxesRouter } from './routes/catalog';
@@ -57,6 +59,8 @@ app.use('/api/portal', portalRouter);
 app.use('/api/external-subscriptions', externalRouter);
 app.use('/api/gmail', gmailRouter);
 app.use('/api/ai', aiRouter);
+app.use('/api/advisor',advisorRouter);
+app.use('/api/calendar',calendarRouter);
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
 app.use(errorHandler);
 

@@ -13,3 +13,8 @@ See TODO.md for remaining work. README.md is the current setup reference; older 
 Live browser sign-in and sign-out through the Nuxt proxy passed. Customer signup and admin-created staff logins passed role-isolation checks. All demo credentials are in apps/api/admin-login.txt (ignored). The seed clock conflict was corrected with upsert; business rows were already loaded, and samples regenerated without resetting cloud data.
 
 SSE proxy stream stayed open through its heartbeat after correcting disconnect handling. Both local services are running.
+
+Gmail scan recovery: differentiated Google permission/quota/authentication errors; added bounded transient retries, paced three-message batches, and skipping messages removed during a scan. The customer scan keeps its current review list and page cursor while the page remains open, with Resume scan and a fresh-scan option. Two focused Gmail error-handling checks passed. Refreshing the browser still clears unsaved discoveries.
+
+## HANDOFF: new personal advisor pivot (incomplete)
+Read HANDOFF.md and PRODUCT_VISION.md first. New shared advisor rules, schema/migration 004, advisor API and Calendar API/OAuth source have been added. Migration 004 is NOT applied. Frontend onboarding/timeline/advisor screens are NOT built. Middleware already references missing /portal/onboarding; current source is an unfinished transition. Do not confuse older successful builds with verification of this pivot.

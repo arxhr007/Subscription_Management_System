@@ -159,9 +159,9 @@ export function priceInvoice(
     applied.add(bestSub.d.id);
     const shares = allocate(bestSub.amount, lines.map((l) => l.net));
     lines.forEach((l, i) => {
-      l.discount += shares[i];
-      l.net -= shares[i];
-      if (shares[i] > 0) l.discountNames.push(bestSub!.d.name);
+      l.discount += shares[i] ?? 0;
+      l.net -= shares[i] ?? 0;
+      if ((shares[i] ?? 0) > 0) l.discountNames.push(bestSub!.d.name);
     });
   }
 

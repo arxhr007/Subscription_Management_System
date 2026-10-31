@@ -12,7 +12,7 @@ export function sseHandler(req: Request, res: Response) {
   const client: Client = { res, userId: req.user!.id, role: req.user!.role, customerId: req.user!.customerId };
   clients.add(client);
   const ping = setInterval(() => res.write(': ping\n\n'), 25_000);
-  req.on('close', () => { clearInterval(ping); clients.delete(client); });
+  res.on('close', () => { clearInterval(ping); clients.delete(client); });
 }
 
 let pending = new Set<Topic>();

@@ -1,35 +1,25 @@
-// Local SQLite database (offline, zero setup). Switch `provider` to "postgresql" and DATABASE_URL to a
-// Postgres URL to run on Postgres. Enums are stored as strings and validated by @brightloop/shared.
-// Money columns are integer paise.
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
+  gmailConnection GmailConnection?
+  externalSubscriptions ExternalSubscription[]
   id           String       @id @default(cuid())
   email        String       @unique
   name         String
-  passwordHash String
+  authId       String?      @unique @db.Uuid
   role         String // ADMIN | STAFF | CUSTOMER
   createdAt    DateTime     @default(now())
   customer     Customer?
-  resetTokens  ResetToken[]
 }
 
-model ResetToken {
-  id        String    @id @default(cuid())
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String    @unique
-  expiresAt DateTime
-  usedAt    DateTime?
-}
 
 model Customer {
   id            String         @id @default(cuid())
@@ -228,6 +218,7 @@ model InvoiceLine {
 }
 
 model Payment {
+  idempotencyKey String? @unique
   id        String   @id @default(cuid())
   invoiceId String
   invoice   Invoice  @relation(fields: [invoiceId], references: [id])
@@ -253,13 +244,6 @@ model AuditLog {
   @@index([entityType, entityId])
 }
 
-model Email {
-  id        String   @id @default(cuid())
-  to        String
-  subject   String
-  body      String
-  createdAt DateTime @default(now())
-}
 
 model Sequence {
   name  String @id
@@ -269,4 +253,31 @@ model Sequence {
 model AppClock {
   id       Int    @id @default(1)
   offsetMs BigInt @default(0)
+}
+
+model ExternalSubscription {
+  id            String @id @default(cuid())
+  userId        String
+  user          User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  amount        Int
+  interval      String
+  nextRenewal   DateTime
+  status        String @default("ACTIVE")
+  managementUrl String @default("")
+  notes         String @default("")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId, status, nextRenewal])
+}
+
+model GmailConnection {
+  userId String @id
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email String
+  accessToken String
+  refreshToken String?
+  expiresAt DateTime
+  connectedAt DateTime @default(now())
 }

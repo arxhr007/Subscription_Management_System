@@ -1,0 +1,8 @@
+<script setup lang="ts">
+import { signupSchema } from '@brightloop/shared'
+definePageMeta({ layout: false })
+const state = reactive({ name: '', email: '', password: '', confirmPassword: '' })
+const busy = ref(false), error = ref(''), complete = ref(false)
+async function submit() { busy.value = true; error.value = ''; try { await useApi()('/auth/signup', { method: 'POST', body: state }); complete.value = true } catch(e) { error.value = errorMessage(e) } finally { busy.value = false } }
+</script>
+<template><main class="min-h-screen flex justify-center items-center bg-elevated/30 p-6"><UCard class="w-full max-w-md"><h1 class="text-2xl font-semibold mb-2">Join Brightloop</h1><p class="text-muted mb-6">Your subscriptions, invoices and payments in one place.</p><UAlert v-if="error" color="error" :title="error" class="mb-4" /><div v-if="complete"><UAlert color="success" title="Your account is ready" /><UButton to="/login" block class="mt-4">Continue to sign in</UButton></div><UForm v-else :schema="signupSchema" :state="state" class="space-y-4" @submit="submit"><UFormField v-for="field in (['name', 'email', 'password', 'confirmPassword'] as const)" :key="field" :name="field" :label="field === 'confirmPassword' ? 'Confirm password' : field.charAt(0).toUpperCase()+field.slice(1)"><UInput v-model="state[field]" :type="field.toLowerCase().includes('password') ? 'password' : field === 'email' ? 'email' : 'text'" class="w-full" /></UFormField><p class="text-xs text-muted">Use 9+ characters with uppercase, lowercase and a special character.</p><UButton type="submit" block :loading="busy">Create account</UButton></UForm><UButton to="/login" variant="link" class="mt-4">Back to sign in</UButton></UCard></main></template>

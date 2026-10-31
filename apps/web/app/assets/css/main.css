@@ -1,0 +1,22 @@
+@import 'tailwindcss' theme(static);
+@import '@fontsource/public-sans/400.css';
+@import '@fontsource/public-sans/500.css';
+@import '@fontsource/public-sans/600.css';
+@import '@fontsource/public-sans/700.css';
+@import '@nuxt/ui';
+body { margin: 0; }
+.page { max-width: none; width: 100%; margin: auto; padding: 0; }
+.page-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.75rem; }
+.page-head h1 { font-size: 1.5rem; font-weight: 650; letter-spacing: -.035em; }
+.page-head p { color: var(--ui-text-muted); margin-top: .35rem; font-size: .875rem; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,240px),1fr)); gap: 1rem; }
+@media print { .no-print, aside, header { display: none !important; } main { overflow: visible !important; } body { background: white; color: black; } }
+
+/* Theme tokens from the official Nuxt UI dashboard template (MIT). */
+@theme static {
+ --font-sans: 'Public Sans', sans-serif;
+ --color-green-50:#EFFDF5; --color-green-100:#D9FBE8; --color-green-200:#B3F5D1;
+ --color-green-300:#75EDAE; --color-green-400:#00DC82; --color-green-500:#00C16A;
+ --color-green-600:#00A155; --color-green-700:#007F45; --color-green-800:#016538;
+ --color-green-900:#0A5331; --color-green-950:#052E16;
+}

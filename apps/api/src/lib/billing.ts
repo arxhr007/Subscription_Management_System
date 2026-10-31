@@ -61,11 +61,15 @@ type SubForBilling = SubForPricing & { customerId: string; paymentTerm: string; 
 export async function invoicePeriod(sub: SubForBilling, periodStart: Date, ctx: PricingContext, opts: { confirm: boolean; actor?: string }) {
   const interval = sub.plan.interval as Interval;
   const periodEnd = addInterval(periodStart, interval);
-  const priced = priceInvoice(pricingLines(sub), { discounts: ctx.discounts, taxes: ctx.taxes, at: periodStart, subscriptionId: sub.id });
+
   const issueDate = periodStart;
 
   try {
     const invoice = await prisma.$transaction(async (tx) => {
+      // Transaction-scoped global invoice lock protects discount usage across workers.
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(71001)::text`;
+      const fresh = await loadPricingContext(tx);
+      const priced = priceInvoice(pricingLines(sub), { discounts: fresh.discounts, taxes: fresh.taxes, at: periodStart, subscriptionId: sub.id });
       const number = await nextNumber(tx, 'INV', issueDate.getUTCFullYear());
       const inv = await tx.invoice.create({
         data: {
@@ -87,11 +91,11 @@ export async function invoicePeriod(sub: SubForBilling, periodStart: Date, ctx: 
       return inv;
     });
     // Keep the in-memory rules in step so usage limits hold within the same run.
-    for (const id of priced.appliedDiscountIds) { const d = ctx.discounts.find((x) => x.id === id); if (d) d.usedCount++; }
+
     return invoice;
   } catch (e) {
     if (!isUniqueViolation(e)) throw e;
-    await prisma.subscription.update({ where: { id: sub.id }, data: { nextInvoiceDate: periodEnd } });
+    await prisma.subscription.updateMany({ where: { id: sub.id, nextInvoiceDate: { lt: periodEnd } }, data: { nextInvoiceDate: periodEnd } });
     return null;
   }
 }
@@ -203,7 +207,12 @@ let running: Promise<unknown> = Promise.resolve();
 
 /** Runs lifecycle + billing one at a time (scheduler and Time Machine never overlap). */
 export function runAllJobs(actor?: string) {
-  const job = running.then(async () => {
+  const job = running.then(() => prisma.$transaction(async lock => {
+    await lock.$queryRaw`SELECT pg_advisory_xact_lock(71002)::text`;
+    for (const sub of await prisma.subscription.findMany({ where: { status: 'CONFIRMED', startDate: { lte: now() } } })) {
+      await prisma.$transaction(tx => activateSubscription(tx, sub));
+    }
+    const catchup = await runBilling({ actor });
     const life1 = await runLifecycle();
     const billing = await runBilling({ actor });
     const life2 = await runLifecycle(); // renewals extend expiry → bill the new periods too
@@ -213,10 +222,10 @@ export function runAllJobs(actor?: string) {
       closed: life1.closed + life2.closed,
       renewed: life1.renewed + life2.renewed,
       quotesExpired: life1.quotesExpired + life2.quotesExpired,
-      invoicesCreated: billing.invoicesCreated + billing2.invoicesCreated,
-      duplicatesBlocked: billing.duplicatesBlocked + billing2.duplicatesBlocked,
+      invoicesCreated: catchup.invoicesCreated + billing.invoicesCreated + billing2.invoicesCreated,
+      duplicatesBlocked: catchup.duplicatesBlocked + billing.duplicatesBlocked + billing2.duplicatesBlocked,
     };
-  });
+  }, { timeout: 300_000, maxWait: 10_000 }));
   running = job.catch(() => undefined);
   return job;
 }

@@ -6,30 +6,28 @@
   "scripts": {
     "dev": "tsx watch --clear-screen=false src/index.ts",
     "start": "tsx src/index.ts",
-    "db:setup": "prisma db push --skip-generate && prisma generate && tsx prisma/seed.ts",
-    "db:reset": "prisma db push --force-reset --skip-generate && prisma generate && tsx prisma/seed.ts",
+    "db:setup": "prisma migrate deploy && prisma generate",
     "seed": "tsx prisma/seed.ts",
     "samples": "tsx scripts/samples.ts",
-    "check:idempotency": "tsx scripts/check-idempotency.ts"
+    "check:idempotency": "tsx scripts/check-idempotency.ts",
+    "db:generate": "prisma generate",
+    "typecheck": "tsc -p .",
+    "bootstrap": "tsx scripts/bootstrap.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^1.3.0",
-    "@brightloop/shared": "*",
+    "@brightloop/shared": "workspace:*",
     "@prisma/client": "^6.16.0",
-    "bcryptjs": "^3.0.2",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.2.0",
     "express": "^5.3.0",
-    "jsonwebtoken": "^9.0.2",
-    "nodemailer": "^10.3.1",
-    "zod": "^4.6.7"
+    "zod": "^4.6.7",
+    "@supabase/supabase-js": "2.118.0",
+    "openai": "^6.0.0"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.9",
     "@types/express": "^5.0.3",
-    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.16.0",
-    "@types/nodemailer": "^8.0.2",
     "prisma": "^6.16.0",
     "tsx": "^4.20.3"
   }

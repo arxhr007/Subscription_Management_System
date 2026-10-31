@@ -1,22 +1,25 @@
 // "Ask Finance": a natural-language window onto the same read-only queries the dashboard uses.
-// Claude never touches SQL; it can only call the tools below. Without a key or internet the feature hides itself.
-import Anthropic from '@anthropic-ai/sdk';
-import { betaZodTool } from '@anthropic-ai/sdk/helpers/beta/zod';
+// The assistant never touches SQL; it can only call the tools below. Without a key or internet the feature hides itself.
+import OpenAI from 'openai';
+import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 import { Router } from 'express';
 import { z } from 'zod';
 import { formatMoney } from '@brightloop/shared';
-import { staffOnly } from '../lib/auth';
+import { staffOnly, rateLimit } from '../lib/auth';
 import { now } from '../lib/clock';
 import { prisma } from '../lib/db';
 import { HttpError, parse } from '../lib/http';
 import { dashboardData } from './dashboard';
 
-const enabled = Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
-const client = enabled ? new Anthropic() : null;
+const enabled = Boolean(process.env.DEEPSEEK_API_KEY);
+const client = enabled ? new OpenAI({ apiKey: process.env.DEEPSEEK_API_KEY, baseURL: 'https://api.deepseek.com', timeout: 20_000, maxRetries: 1 }) : null;
+function defineTool<T extends z.ZodType>(tool: { name: string; description: string; inputSchema: T; run: (input: z.output<T>) => Promise<string> }) {
+  return { ...tool, execute: (input: unknown) => tool.run(tool.inputSchema.parse(input)) };
+}
 const DAY = 86_400_000;
 
 const tools = [
-  betaZodTool({
+  defineTool({
     name: 'get_kpis',
     description: 'Headline numbers: active subscriptions, MRR, ARR, collected this month, outstanding and overdue receivables, renewals due in 30 days, 30-day churn, monthly invoiced vs collected series, overdue aging buckets, MRR by plan.',
     inputSchema: z.object({ months: z.union([z.literal(3), z.literal(6), z.literal(12)]).optional().describe('Length of the monthly series (default 12)') }),
@@ -33,7 +36,7 @@ const tools = [
       });
     },
   }),
-  betaZodTool({
+  defineTool({
     name: 'list_overdue_invoices',
     description: 'Unpaid confirmed invoices past their due date, oldest first, with customer and amount due.',
     inputSchema: z.object({
@@ -53,7 +56,7 @@ const tools = [
       })));
     },
   }),
-  betaZodTool({
+  defineTool({
     name: 'top_customers',
     description: 'Customers ranked by recurring revenue (MRR of active subscriptions) or by outstanding balance.',
     inputSchema: z.object({ by: z.enum(['mrr', 'outstanding']), limit: z.number().int().min(1).max(25).optional() }),
@@ -70,7 +73,7 @@ const tools = [
       return JSON.stringify(top.map((r) => ({ customer: names.get(r.id), outstanding: formatMoney(r.due) })));
     },
   }),
-  betaZodTool({
+  defineTool({
     name: 'find_subscriptions',
     description: 'Search subscriptions by status, plan name, customer name, or expiring within N days. Returns up to 25 rows.',
     inputSchema: z.object({
@@ -107,31 +110,41 @@ aiRouter.use(staffOnly);
 
 aiRouter.get('/status', (_req, res) => res.json({ enabled }));
 
-aiRouter.post('/ask', async (req, res) => {
-  if (!client) throw new HttpError(503, 'Ask Finance is not configured (set ANTHROPIC_API_KEY on the server).');
+aiRouter.post('/ask', rateLimit(20, 60_000), async (req, res) => {
+  if (!client) throw new HttpError(503, 'Ask Finance is not configured (set DEEPSEEK_API_KEY on the server).');
   const { question, history } = parse(z.object({
     question: z.string().trim().min(3, 'Ask a question').max(500, 'Keep the question under 500 characters'),
     history: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(4000) })).max(10).default([]),
   }), req.body);
 
   try {
-    const final = await client.beta.messages.toolRunner({
-      model: 'claude-haiku-5-5',
-      max_tokens: 4000,
-      output_config: { effort: 'low' },
-      system: SYSTEM,
-      tools,
-      messages: [...history, { role: 'user', content: question }],
-      max_iterations: 6,
-    });
-    if (final.stop_reason === 'refusal') return res.json({ answer: 'I can’t help with that one. Try asking about revenue, invoices or subscriptions.' });
-    const answer = final.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
-    res.json({ answer: answer || 'I could not find an answer in the billing data.' });
+    const messages: ChatCompletionMessageParam[] = [{ role: 'system', content: SYSTEM }, ...history, { role: 'user', content: question }];
+    const deadline = Date.now() + 45_000;
+    for (let turn = 0; turn < 6; turn++) {
+      if (Date.now() > deadline) throw new HttpError(504, 'Ask Finance took too long. Try a narrower question.');
+      const result = await client.chat.completions.create({
+        model: process.env.DEEPSEEK_MODEL || 'deepseek-flash', messages, max_tokens: 2000,
+        tools: tools.map(t => ({ type: 'function' as const, function: { name: t.name, description: t.description, parameters: z.toJSONSchema(t.inputSchema) } })),
+      });
+      const message = result.choices[0]?.message;
+      if (!message) throw new HttpError(502, 'No response from Ask Finance');
+      if (!message.tool_calls?.length) return res.json({ answer: message.content || 'No answer found in the billing data.' });
+      if (message.tool_calls.length > 8) throw new HttpError(502, 'Too many tool calls requested');
+      messages.push(message);
+      for (const call of message.tool_calls) {
+        if (call.type !== 'function') throw new HttpError(502, 'Unsupported tool call');
+        const tool = tools.find(t => t.name === call.function.name);
+        let content: string;
+        try { content = tool ? await tool.execute(JSON.parse(call.function.arguments)) : 'Unknown tool'; }
+        catch { content = 'Tool could not run. Check arguments; do not invent data.'; }
+        messages.push({ role: 'tool', tool_call_id: call.id, content });
+      }
+    }
+    throw new HttpError(502, 'Ask Finance reached its query limit. Try a narrower question.');
   } catch (e) {
-    if (e instanceof Anthropic.APIConnectionError) throw new HttpError(503, 'Ask Finance needs an internet connection. Everything else keeps working offline.');
-    if (e instanceof Anthropic.AuthenticationError) throw new HttpError(503, 'Ask Finance is misconfigured (the API key was rejected).');
-    if (e instanceof Anthropic.RateLimitError) throw new HttpError(429, 'Ask Finance is busy. Try again in a moment.');
-    if (e instanceof Anthropic.APIError) throw new HttpError(502, `Ask Finance failed (${e.status ?? 'error'}). Try again.`);
+    if (e instanceof OpenAI.AuthenticationError) throw new HttpError(503, 'Ask Finance API key was rejected');
+    if (e instanceof OpenAI.RateLimitError) throw new HttpError(429, 'Ask Finance is busy. Try again shortly.');
+    if (e instanceof OpenAI.APIError) throw new HttpError(502, 'Ask Finance is temporarily unavailable');
     throw e;
   }
 });

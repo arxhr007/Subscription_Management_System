@@ -19,7 +19,7 @@ const myCustomerId = (req: { user?: { customerId: string | null } }) => {
 
 async function ownSubscription(id: string, customerId: string) {
   const s = await prisma.subscription.findUnique({ where: { id }, select: { customerId: true, status: true } });
-  if (!s || s.customerId !== customerId) throw notFound('Subscription');
+  if (!s || s.status === 'DRAFT' || s.customerId !== customerId) throw notFound('Subscription');
   return s;
 }
 
@@ -76,7 +76,7 @@ portalRouter.post('/invoices/:id/pay', async (req, res) => {
   const { method } = parse(z.object({ method: z.enum(['CARD', 'UPI']) }), req.body);
   const inv = await invoiceDetail(req.params.id);
   if (inv.customerId !== myCustomerId(req)) throw notFound('Invoice');
-  await prisma.$transaction((tx) => recordPayment(tx, { invoiceId: inv.id, method, amount: inv.amountDue, date: now(), note: 'Paid online via customer portal (simulated)' }, `${req.user!.name} (customer)`));
+  await prisma.$transaction((tx) => recordPayment(tx, { invoiceId: inv.id, method, amount: inv.amountDue, date: now(), idempotencyKey: parse(z.string().uuid(), req.get('Idempotency-Key')), note: 'Paid online via customer portal (simulated)' }, `${req.user!.name} (customer)`));
   broadcast('payments', 'invoices');
   res.json(await invoiceDetail(inv.id));
 });

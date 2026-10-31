@@ -1,0 +1,9 @@
+customer_name,customer_email,plan,product,variant,quantity,start_date,expiry_date,unit_price,payment_term
+Kite Bakery,owner@kitebakery.in,Monthly,Brightloop CRM,Odoo,3,2026-03-01,,,NET_15
+Kite Bakery,owner@kitebakery.in,Monthly,Analytics Add-on,,2,2026-03-01,,,NET_15
+Riverstone Dental,admin@riverstonedental.in,Yearly Contract,Brightloop Books,Pro,6,2026-01-15,2027-01-15,,NET_30
+Pixel Prints,hello@pixelprints.in,Weekly Flex,Extra Storage 100 GB,,1,2026-09-01,,62.50,IMMEDIATE
+Bad Row Co,not-an-email,Monthly,Brightloop CRM,,2,2026-05-01,,,NET_15
+Tiny Seats Ltd,ops@tinyseats.in,Yearly Contract,Brightloop CRM,,2,2026-02-01,2027-02-01,,NET_30
+Ghost Plan Inc,ops@ghostplan.in,Platinum,Brightloop CRM,,2,2026-02-01,,,NET_30
+Late Dates LLP,ops@latedates.in,Monthly,Brightloop CRM,,2,2026-06-01,2026-05-01,,NET_15

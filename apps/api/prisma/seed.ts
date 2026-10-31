@@ -2,7 +2,6 @@
 // priced by the same engine the app uses. Deterministic (seeded PRNG) so every run looks the same.
 import 'dotenv/config';
 import { randomUUID } from 'node:crypto';
-import bcrypt from 'bcryptjs';
 import { PrismaClient } from '@prisma/client';
 import { writeSamples } from '../scripts/samples';
 import { addInterval, dueDateFor, PAYMENT_METHODS, priceInvoice, toMonthly, type DiscountRule, type Interval, type PaymentTerm, type PricingLine, type ProductType, type TaxRule } from '@brightloop/shared';
@@ -26,12 +25,12 @@ async function chunked<T>(rows: T[], fn: (batch: T[]) => Promise<unknown>, size 
 
 async function main() {
   console.log('Seeding Brightloop…');
-  const hash = (p: string) => bcrypt.hash(p, 10);
+  if (await prisma.user.count()) throw new Error('Seed requires an empty application database. No existing data was changed.');
 
   // ---------- users ----------
-  const admin = await prisma.user.create({ data: { email: 'admin@brightloop.test', name: 'Meera Admin', role: 'ADMIN', passwordHash: await hash('Admin@1234') } });
-  await prisma.user.create({ data: { email: 'staff@brightloop.test', name: 'Ravi Sales', role: 'STAFF', passwordHash: await hash('Staff@1234') } });
-  const demoUser = await prisma.user.create({ data: { email: 'customer@brightloop.test', name: 'Asha Retail', role: 'CUSTOMER', passwordHash: await hash('Customer@1234') } });
+  const admin = await prisma.user.create({ data: { email: 'admin@brightloop.test', name: 'Meera Admin', role: 'ADMIN' } });
+  await prisma.user.create({ data: { email: 'staff@brightloop.test', name: 'Ravi Sales', role: 'STAFF' } });
+  const demoUser = await prisma.user.create({ data: { email: 'customer@brightloop.test', name: 'Asha Retail', role: 'CUSTOMER' } });
 
   // ---------- taxes ----------
   const taxRows = [
@@ -220,12 +219,12 @@ async function main() {
   await chunked(payments, (b) => prisma.payment.createMany({ data: b as never }));
   await chunked(audits, (b) => prisma.auditLog.createMany({ data: b as never }));
   await prisma.sequence.createMany({ data: Object.entries(seq).map(([name, value]) => ({ name, value })) });
-  await prisma.appClock.create({ data: { id: 1, offsetMs: 0n } });
+  await prisma.appClock.upsert({ where: { id: 1 }, create: { id: 1, offsetMs: 0n }, update: {} });
 
   console.log(`  ${customers.length} customers, ${subs.length} subscriptions, ${invoices.length} invoices, ${payments.length} payments`);
 
   await writeSamples(prisma);
-  console.log('\nLogins:\n  admin@brightloop.test / Admin@1234\n  staff@brightloop.test / Staff@1234\n  customer@brightloop.test / Customer@1234');
+  console.log('Business fixtures created. Use the bootstrap script for Supabase login credentials.');
   void admin;
 }
 

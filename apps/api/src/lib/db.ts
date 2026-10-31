@@ -4,9 +4,7 @@ export const prisma = new PrismaClient();
 export type Tx = Prisma.TransactionClient;
 
 export async function initDb() {
-  // WAL lets the dashboard read while a billing run writes.
-  await prisma.$queryRawUnsafe('PRAGMA journal_mode=WAL;');
-  await prisma.$queryRawUnsafe('PRAGMA busy_timeout=5000;');
+  await prisma.$connect();
 }
 
 /** Next number in a named sequence, e.g. nextNumber(tx, 'INV', 2026) → "INV/2026/00042". Runs inside the caller's transaction. */

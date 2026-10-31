@@ -5,10 +5,12 @@ const route=useRoute()
 const colorMode=useColorMode()
 const sidebarOpen=ref(false)
 watch(()=>route.path,()=>{sidebarOpen.value=false})
-const titles:Record<string,string>={'/portal':'Advisor','/portal/timeline':'Timeline','/portal/subscriptions':'Subscriptions','/portal/preferences':'Preferences','/portal/onboarding':'Welcome'}
+const titles:Record<string,string>={'/portal':'Advisor','/portal/plan':'Plan','/portal/recommendations':'Recommendations','/portal/timeline':'Timeline','/portal/subscriptions':'Subscriptions','/portal/preferences':'Preferences','/portal/onboarding':'Welcome'}
 const title=computed(()=>titles[route.path]||'Advisor')
 const items=[[
  {label:'Advisor',icon:'i-lucide-sparkles',to:'/portal',exact:true},
+ {label:'Recommendations',icon:'i-lucide-lightbulb',to:'/portal/recommendations'},
+ {label:'Plan',icon:'i-lucide-list-checks',to:'/portal/plan'},
  {label:'Timeline',icon:'i-lucide-calendar-range',to:'/portal/timeline'},
  {label:'Subscriptions',icon:'i-lucide-repeat',to:'/portal/subscriptions'},
  {label:'Preferences',icon:'i-lucide-settings-2',to:'/portal/preferences'}

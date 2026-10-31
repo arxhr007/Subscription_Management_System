@@ -33,7 +33,7 @@ const dayEvents=computed(()=>selectedDay.value?calEvents.value.filter(e=>new Dat
    <div v-if="!data.subscriptions.length" class="border-y border-dashed border-default py-5 flex flex-wrap justify-between gap-4 items-center"><div><p class="font-medium">No services yet.</p></div><UButton to="/portal/subscriptions" trailing-icon="i-lucide-arrow-right">Add subscriptions</UButton></div>
    <div class="grid lg:grid-cols-5 gap-6 items-start">
     <section class="lg:col-span-3">
-     <header class="flex items-center justify-between py-3 border-b-2 border-default"><h2 class="font-semibold">Priority actions</h2><span class="text-xs text-muted">{{data.recommendations.length}} · sorted by urgency</span></header>
+     <header class="flex items-center justify-between py-3 border-b-2 border-default"><h2 class="font-semibold">Priority actions</h2><span class="text-xs text-muted">{{data.recommendations.length}} · sorted by urgency</span><UButton size="xs" variant="link" to="/portal/recommendations">Timeline view</UButton></header>
      <ol class="divide-y divide-default">
       <li v-for="(r,i) in (data.recommendations as Rec[])" :key="r.key" class="py-4 hover:bg-elevated/30">
        <div class="flex gap-4">

@@ -1,3 +1,4 @@
+import { connectCalendar } from './calendar';
 import { connectGmail } from '../lib/gmail';
 import { Router } from 'express';
 import { loginSchema, signupSchema, staffSchema } from '@brightloop/shared';
@@ -68,15 +69,19 @@ authRouter.get('/providers', async (_req,res) => {
 });
 authRouter.get('/google', rateLimit(20,60_000), async (req,res) => {
   const gmail = req.query.gmail === '1';
-  if (gmail && (!req.user || req.user.role !== 'CUSTOMER')) throw new HttpError(403,'Sign in as a customer before connecting Gmail');
+  const calendar=req.query.calendar==='1';
+  if(calendar&&!req.user)throw new HttpError(401,'Sign in before connecting Calendar');
+  if(calendar)res.cookie('bl_calendar_user',req.user!.id,{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax',path:'/api/auth',maxAge:600_000});else res.clearCookie('bl_calendar_user',{path:'/api/auth'});
+  if (gmail && !req.user) throw new HttpError(403,'Sign in as a customer before connecting Gmail');
   if (gmail) res.cookie('bl_gmail_user',req.user!.id,{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax',path:'/api/auth',maxAge:600_000});
   else res.clearCookie('bl_gmail_user',{path:'/api/auth'});
   res.cookie('bl_oauth_popup', req.query.popup === '1' ? '1' : '0', { httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax',path:'/api/auth',maxAge:600_000 });
-  const { data,error } = await oauthClient(req,res).auth.signInWithOAuth({ provider:'google', options: { redirectTo: `${process.env.WEB_ORIGIN ?? 'http://localhost:3000'}/api/auth/callback`, skipBrowserRedirect:true, scopes: gmail ? 'https://www.googleapis.com/auth/gmail.readonly' : undefined, queryParams: gmail ? {prompt:'consent select_account',access_type:'offline'} : { prompt: 'select_account' } } });
+  const { data,error } = await oauthClient(req,res).auth.signInWithOAuth({ provider:'google', options: { redirectTo: `${process.env.WEB_ORIGIN ?? 'http://localhost:3000'}/api/auth/callback`, skipBrowserRedirect:true, scopes: gmail ? 'https://www.googleapis.com/auth/gmail.readonly' : calendar?'https://www.googleapis.com/auth/calendar.events.readonly':undefined, queryParams: gmail||calendar ? {prompt:'consent select_account',access_type:'offline'} : { prompt: 'select_account' } } });
   if (error || !data.url) return res.redirect('/login?oauth_error=unavailable');
   res.redirect(data.url);
 });
 authRouter.get('/callback', async(req,res) => {
+  const calendarOwner=req.cookies?.bl_calendar_user as string|undefined;res.clearCookie('bl_calendar_user',{path:'/api/auth'});
   const gmailOwner = req.cookies?.bl_gmail_user as string | undefined;
   res.clearCookie('bl_gmail_user',{path:'/api/auth'});
   const popup = req.cookies?.bl_oauth_popup === '1';
@@ -86,13 +91,14 @@ authRouter.get('/callback', async(req,res) => {
   if (!code || !req.cookies?.bl_oauth_verifier) return fail('expired');
   const { data,error } = await oauthClient(req,res).auth.exchangeCodeForSession(code);
   if (error || !data.session || !data.user) return fail('failed');
+  if(calendarOwner){const owner=await prisma.user.findUnique({where:{id:calendarOwner}});if(!owner||owner.authId!==data.user.id||!data.session.provider_token)return res.redirect('/portal/timeline?calendar_error=account');try{await connectCalendar(owner.id,data.session.provider_token,data.session.provider_refresh_token)}catch{return res.redirect('/portal/timeline?calendar_error=permission')}setSession(res,data.session);return res.redirect('/portal/timeline?calendar_connected=1')}
   if (gmailOwner) {
     const owner=await prisma.user.findUnique({where:{id:gmailOwner}});
-    if (!owner || owner.role!=='CUSTOMER' || owner.authId!==data.user.id || !data.session.provider_token) return res.redirect('/portal/external?gmail_error=account');
+    if (!owner || owner.authId!==data.user.id || !data.session.provider_token) return res.redirect('/portal?gmail_error=account');
     try { await connectGmail(owner.id,data.session.provider_token,data.session.provider_refresh_token); }
-    catch { return res.redirect('/portal/external?gmail_error=permission'); }
+    catch { return res.redirect('/portal?gmail_error=permission'); }
     setSession(res,data.session);
-    return res.redirect('/portal/external?gmail_connected=1');
+    return res.redirect('/portal?gmail_connected=1');
   }
   const identity = data.user;
   let user = await prisma.user.findUnique({ where:{authId:identity.id} });
@@ -107,5 +113,5 @@ authRouter.get('/callback', async(req,res) => {
   }
   if (!user) return fail('failed');
   setSession(res,data.session);
-  res.redirect(popup ? '/auth/complete' : user.role==='CUSTOMER'?'/portal':'/');
+  res.redirect(popup ? '/auth/complete' : '/portal');
 });

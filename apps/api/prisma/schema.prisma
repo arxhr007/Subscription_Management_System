@@ -9,6 +9,11 @@ datasource db {
 }
 
 model User {
+  advisorProfile AdvisorProfile?
+  activities LifeActivity[]
+  intentions SubscriptionIntent[]
+  advisorFeedback AdvisorFeedback[]
+  calendarConnection CalendarConnection?
   gmailConnection GmailConnection?
   externalSubscriptions ExternalSubscription[]
   id           String       @id @default(cuid())
@@ -256,13 +261,18 @@ model AppClock {
 }
 
 model ExternalSubscription {
+  category String @default("Other")
+  usage String @default("UNKNOWN")
+  importance Int @default(3)
+  purpose String @default("")
+  intentions SubscriptionIntent[]
   id            String @id @default(cuid())
   userId        String
   user          User @relation(fields: [userId], references: [id], onDelete: Cascade)
   name          String
   amount        Int
   interval      String
-  nextRenewal   DateTime
+  nextRenewal   DateTime?
   status        String @default("ACTIVE")
   managementUrl String @default("")
   notes         String @default("")
@@ -280,4 +290,66 @@ model GmailConnection {
   refreshToken String?
   expiresAt DateTime
   connectedAt DateTime @default(now())
+}
+
+model AdvisorProfile {
+ userId String @id
+ user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+ name String
+ occupation String
+ interests String[]
+ activities String @default("")
+ budget Int?
+ notifications Boolean @default(true)
+ onboardedAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+}
+model LifeActivity {
+ id String @id @default(cuid())
+ userId String
+ user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+ title String
+ description String @default("")
+ kind String @default("OTHER")
+ startDate DateTime
+ endDate DateTime
+ source String @default("MANUAL")
+ sourceRef String?
+ kindLocked Boolean @default(false)
+ intentions SubscriptionIntent[]
+ @@unique([userId,sourceRef])
+ @@index([userId,startDate])
+}
+model SubscriptionIntent {
+ id String @id @default(cuid())
+ userId String
+ user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+ subscriptionId String
+ subscription ExternalSubscription @relation(fields:[subscriptionId],references:[id],onDelete:Cascade)
+ activityId String?
+ activity LifeActivity? @relation(fields:[activityId],references:[id],onDelete:SetNull)
+ reason String
+ startDate DateTime
+ endDate DateTime?
+ status String @default("PLANNED")
+ createdAt DateTime @default(now())
+ @@index([userId,startDate])
+}
+model AdvisorFeedback {
+ id String @id @default(cuid())
+ userId String
+ user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+ recommendationKey String
+ action String
+ note String @default("")
+ createdAt DateTime @default(now())
+ @@unique([userId,recommendationKey])
+}
+model CalendarConnection {
+ userId String @id
+ user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+ accessToken String
+ refreshToken String?
+ expiresAt DateTime
+ syncedAt DateTime?
 }

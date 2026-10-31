@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import { externalSubscriptionSchema, toMonthly, type Interval } from '@brightloop/shared';
-import { requireRole } from '../lib/auth';
+import { requireAuth } from '../lib/auth';
 import { prisma } from '../lib/db';
 import { HttpError, parse } from '../lib/http';
 
 export const externalRouter = Router();
-externalRouter.use(requireRole('CUSTOMER'));
+externalRouter.use(requireAuth);
 externalRouter.get('/', async (req,res) => {
   const items = await prisma.externalSubscription.findMany({ where: { userId: req.user!.id }, orderBy: [{ status: 'asc' }, { nextRenewal: 'asc' }] });
   const active = items.filter(i => i.status === 'ACTIVE');
@@ -14,11 +14,11 @@ externalRouter.get('/', async (req,res) => {
 });
 externalRouter.post('/', async(req,res) => {
   const d = parse(externalSubscriptionSchema,req.body);
-  res.status(201).json(await prisma.externalSubscription.create({ data: { ...d, nextRenewal: new Date(d.nextRenewal), userId: req.user!.id } }));
+  res.status(201).json(await prisma.externalSubscription.create({ data: { ...d, nextRenewal: d.nextRenewal?new Date(d.nextRenewal):null, userId: req.user!.id } }));
 });
 externalRouter.put('/:id', async(req,res) => {
   const d = parse(externalSubscriptionSchema,req.body);
-  const result = await prisma.externalSubscription.updateMany({ where: { id: String(req.params.id), userId: req.user!.id }, data: { ...d, nextRenewal: new Date(d.nextRenewal) } });
+  const result = await prisma.externalSubscription.updateMany({ where: { id: String(req.params.id), userId: req.user!.id }, data: { ...d, nextRenewal: d.nextRenewal?new Date(d.nextRenewal):null } });
   if (!result.count) throw new HttpError(404,'Subscription not found');
   res.json({ ok:true });
 });
